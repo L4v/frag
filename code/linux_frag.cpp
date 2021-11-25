@@ -1,3 +1,5 @@
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
 #include <iostream>
 #include <cstdint>
 #include "include/glad/glad.h"
@@ -13,6 +15,8 @@
 #include <assimp/postprocess.h>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #define global static
 #define internal static
@@ -22,6 +26,7 @@
 #define POSITION_LOCATION 0
 #define TEX_COORD_LOCATION 1
 #define NORMAL_LOCATION 2
+#define POINT_LIGHT_COUNT 1
 
 typedef int8_t i8;
 typedef int16_t i16;
@@ -91,6 +96,50 @@ struct Texture {
     }
 };
 
+struct Light {
+    glm::vec3 Position;
+    r32       Size;
+
+    r32       Kc;
+    r32       Kl;
+    r32       Kq;
+
+    glm::vec3 Ambient;
+    glm::vec3 Diffuse;
+    glm::vec3 Specular;
+};
+
+struct Camera {
+    r32       FOV;
+    r32       Pitch;
+    r32       Yaw;
+    r32       Speed;
+
+    glm::vec3 Position;
+    glm::vec3 Target;
+    glm::vec3 Direction;
+
+    glm::vec3 Front;
+    glm::vec3 Up;
+    glm::vec3 Right;
+
+    Camera(float fov, float pitch, float yaw, float speed) {
+        // TODO(Jovan): Extract into parameters
+        FOV   = fov;
+        Pitch = pitch;
+        Yaw   = yaw;
+        Speed = speed;
+
+        Position     = glm::vec3(0.0f, 0.0f, 3.0f);
+        glm::vec3 Up = glm::vec3(0.0f, 1.0f, 0.0f);
+        Target       = glm::vec3(0.0f, 0.0f, 0.0f);
+        Direction    = glm::normalize(Position - Target);
+        Front        = glm::vec3(0.0f, 0.0f, -1.0f);
+        Right        = glm::normalize(glm::cross(Up, Direction));
+        this->Up     = glm::cross(Direction, Right);
+    }
+};
+
 internal void
 _ErrorCallback(int error, const char* description) {
     std::cerr << "[Err] GLFW: " << description << std::endl;
@@ -101,6 +150,21 @@ _KeyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action, i32 mods) {
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
+}
+
+internal void
+SetUniformf1(u32 programID, std::string uniform, float f) {
+    glUniform1f(glGetUniformLocation(programID, uniform.c_str()), f);
+}
+
+internal void
+SetUniform3fv(u32 programID, std::string uniform, const glm::vec3 &v) {
+    glUniform3fv(glGetUniformLocation(programID, uniform.c_str()), 1, &v[0]);
+}
+
+internal void
+SetUniform4m(u32 programID, std::string uniform, const glm::mat4 &m) {
+    glUniformMatrix4fv(glGetUniformLocation(programID, uniform.c_str()), 1, GL_FALSE, &m[0][0]);
 }
 
 internal u32
@@ -125,7 +189,7 @@ LoadAndCompileShader(std::string filename, GLuint shaderType) {
     glGetShaderiv(ShaderID, GL_COMPILE_STATUS, &Success);
     if (!Success) {
         glGetShaderInfoLog(ShaderID, 256, NULL, InfoLog);
-        std::cout << "Error while compiling shader:" << std::endl << InfoLog << std::endl;
+        std::cout << "Error while compiling shader [" << shaderType << "]:" << std::endl << InfoLog << std::endl;
         return 0;
     }
 
@@ -318,6 +382,22 @@ main() {
     glDetachShader(ProgramID, FShader);
     glDeleteShader(VShader); glDeleteShader(FShader);
 
+
+    // NOTE(Jovan): Camera init
+    Camera Camera(45.0f, 0.0f, -90.0f, 0.05f);
+
+    glm::mat4 Projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
+    glm::mat4 View = glm::mat4(1.0f);
+    View = glm::translate(View, glm::vec3(0.0f, 0.0f, -3.0f));
+    View = glm::lookAt(Camera.Position, Camera.Position + Camera.Front, Camera.Up);
+    glm::mat4 Model = glm::mat4(1.0f);
+
+    // NOTE(Jovan): Set texture scale
+    glUseProgram(ProgramID);
+    SetUniformf1(ProgramID, "uTexScale", 1.0f);
+    SetUniform4m(ProgramID, "uProjection", Projection);
+    SetUniform4m(ProgramID, "uView", View);
+
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -328,6 +408,13 @@ main() {
         glViewport(0, 0, G_WWIDTH, G_WHEIGHT);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        View = glm::mat4(1.0f);
+        View = glm::translate(View, glm::vec3(0.0f, 0.0f, -3.0f));
+        View = glm::lookAt(Camera.Position, Camera.Position + Camera.Front, Camera.Up);
+        Model = glm::mat4(1.0f);
+        SetUniform4m(ProgramID, "uView", View);
+        SetUniform4m(ProgramID, "uModel", Model);
 
         // NOTE(Jovan): Render model
         glUseProgram(ProgramID);
