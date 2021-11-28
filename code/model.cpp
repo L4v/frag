@@ -30,6 +30,8 @@ Model::Load() {
         std::cerr << "[Err] Failed to load model:" << std::endl << Importer.GetErrorString() << std::endl;
         Result = false;
     } else {
+        mMeshes.resize(Scene->mNumMeshes);
+        // TODO(Jovan): Resize mTextures
         for(u32 MeshIndex = 0; MeshIndex < mMeshes.size(); ++MeshIndex) {
             mMeshes[MeshIndex].mMaterialIndex = Scene->mMeshes[MeshIndex]->mMaterialIndex;
             mMeshes[MeshIndex].mNumIndices = Scene->mMeshes[MeshIndex]->mNumFaces * 3;
@@ -51,14 +53,14 @@ Model::Load() {
         // TODO(Jovan): Materials (Textures)
         // NOTE(Jovan): Populate buffers
         glBindBuffer(GL_ARRAY_BUFFER, mBuffers[POS_VB]);
-        glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(r32) * mPositions.size(), &mPositions[0][0], GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(mPositions) * mPositions.size(), &mPositions[0], GL_STATIC_DRAW);
         glVertexAttribPointer(POSITION_LOCATION, 3, GL_FLOAT, GL_FALSE, 0, 0);
         glEnableVertexAttribArray(POSITION_LOCATION);
 
         // TODO(Jovan): Populate texture coord buffers
 
         glBindBuffer(GL_ARRAY_BUFFER, mBuffers[NORM_VB]);
-        glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(r32) * mPositions.size(), &mPositions[0][0], GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(mNormals) * mNormals.size(), &mNormals[0], GL_STATIC_DRAW);
         glVertexAttribPointer(NORMAL_LOCATION, 3, GL_FLOAT, GL_FALSE, 0, 0);
         glEnableVertexAttribArray(NORMAL_LOCATION);
 
@@ -67,6 +69,8 @@ Model::Load() {
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+        std::cout << "Loaded " << mMeshes.size() << " meshes" << std::endl;
 
         Result = true;
     }
@@ -80,12 +84,10 @@ Model::ProcessMesh(const aiMesh* mesh) {
     const aiVector3D Zero3D(0.0f, 0.0f, 0.0f);
 
     for(u32 VertexIndex = 0; VertexIndex < mesh->mNumVertices; ++VertexIndex) {
-        const aiVector3D &Position = mesh->mVertices[VertexIndex];
-        const aiVector3D &Normal = mesh->mNormals[VertexIndex];
         const aiVector3D &TexCoord = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][VertexIndex] : Zero3D;
 
-        mPositions.push_back(glm::vec3(Position.x, Position.y, Position.z));
-        mNormals.push_back(glm::vec3(Normal.x, Normal.y, Normal.z));
+        mPositions.push_back(glm::vec3(mesh->mVertices[VertexIndex].x, mesh->mVertices[VertexIndex].y, mesh->mVertices[VertexIndex].z));
+        mNormals.push_back(glm::vec3(mesh->mNormals[VertexIndex].x, mesh->mNormals[VertexIndex].y, mesh->mNormals[VertexIndex].z));
         mTexCoords.push_back(glm::vec2(TexCoord.x, TexCoord.y));
     }
 
@@ -100,6 +102,7 @@ Model::ProcessMesh(const aiMesh* mesh) {
 void
 Model::Render() {
     glBindVertexArray(mVAO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mBuffers[INDEX_BUFFER]);
     for(u32 MeshIdx = 0; MeshIdx < mMeshes.size(); ++MeshIdx) {
         // TODO(Jovan): Texture rendering
         glDrawElementsBaseVertex(GL_TRIANGLES,
@@ -108,5 +111,6 @@ Model::Render() {
                 (void*)(sizeof(u32) * mMeshes[MeshIdx].mBaseIndex),
                 mMeshes[MeshIdx].mBaseVertex);
     }
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 }

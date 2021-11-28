@@ -88,7 +88,7 @@ struct Camera {
 
         Position     = glm::vec3(0.0f, 0.0f, 0.0f);
         glm::vec3 Up = glm::vec3(0.0f, 1.0f, 0.0f);
-        Target       = glm::vec3(0.0f, 0.0f, 0.0f);
+        Target       = glm::vec3(0.0f, 0.0f, -1.0f);
         Direction    = glm::normalize(Position - Target);
         Front        = glm::vec3(0.0f, 0.0f, -1.0f);
         Right        = glm::normalize(glm::cross(Up, Direction));
@@ -131,12 +131,12 @@ _KeyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action, i32 mods) {
 }
 
 internal void
-SetUniformf1(u32 programID, std::string uniform, float f) {
+SetUniform1f(u32 programID, std::string uniform, float f) {
     glUniform1f(glGetUniformLocation(programID, uniform.c_str()), f);
 }
 
 internal void
-SetUniform3fv(u32 programID, std::string uniform, const glm::vec3 &v) {
+SetUniform3f(u32 programID, std::string uniform, const glm::vec3 &v) {
     glUniform3fv(glGetUniformLocation(programID, uniform.c_str()), 1, &v[0]);
 }
 
@@ -243,13 +243,34 @@ main() {
 
     // NOTE(Jovan): Set texture scale
     glUseProgram(ProgramID);
-    SetUniformf1(ProgramID, "uTexScale", 1.0f);
+    SetUniform1f(ProgramID, "uTexScale", 1.0f);
     SetUniform4m(ProgramID, "uProjection", Projection);
     SetUniform4m(ProgramID, "uView", View);
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+    Light PointLight;
+    PointLight.Ambient = glm::vec3(1.0f, 0.0f, 0.0f);
+    PointLight.Diffuse = glm::vec3(1.0f, 0.0f, 0.0f);
+    PointLight.Specular = glm::vec3(1.0f);
+    PointLight.Kc = 1.0f;
+    PointLight.Kl = 0.09f;
+    PointLight.Kq = 0.017f;
+    PointLight.Position = glm::vec3(0.0f, 1.0f, 1.0f);
+    SetUniform3f(ProgramID, "uPointLights[0].Ambient", PointLight.Ambient);
+    SetUniform3f(ProgramID, "uPointLights[0].Diffuse", PointLight.Diffuse);
+    SetUniform3f(ProgramID, "uPointLights[0].Specular", PointLight.Specular);
+    SetUniform3f(ProgramID, "uPointLights[0].Position", PointLight.Position);
+    SetUniform1f(ProgramID, "uPointLights[0].Kc", PointLight.Kc);
+    SetUniform1f(ProgramID, "uPointLights[0].Kl", PointLight.Kl);
+    SetUniform1f(ProgramID, "uPointLights[0].Kq", PointLight.Kq);
+
+    SetUniform3f(ProgramID, "uMaterial.Diffuse", glm::vec3(1.0f, 0.0f, 0.0f));
+    SetUniform3f(ProgramID, "uMaterial.Specular", glm::vec3(1.0f));
+    SetUniform1f(ProgramID, "uMaterial.Shininess", 64.0f);
+
 
     while(!glfwWindowShouldClose(Window)) {
         glfwGetFramebufferSize(Window, &G_WWIDTH, &G_WHEIGHT);
@@ -259,23 +280,22 @@ main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(ProgramID);
 
+        SetUniform3f(ProgramID, "uViewPos", Camera.Position);
+
         View = glm::mat4(1.0f);
         View = glm::translate(View, glm::vec3(0.0f, 0.0f, -3.0f));
         View = glm::lookAt(Camera.Position, Camera.Position + Camera.Front, Camera.Up);
         SetUniform4m(ProgramID, "uView", View);
-        Model = glm::mat4(1.0f);
 
+        Model = glm::mat4(1.0f);
         Model = glm::translate(Model, glm::vec3(0.0f, 0.0f, -3.0f));
         Model = glm::scale(Model, glm::vec3(0.001f));
         SetUniform4m(ProgramID, "uModel", Model);
 
         // NOTE(Jovan): Render model
-
-        std::cout << "Camera pos: " << State.mCamera->Position.x << " " << State.mCamera->Position.z << std::endl;
-
         Amongus.Render();
+        std::cout << "Camera pos: " << State.mCamera->Position.x << " " << State.mCamera->Position.z << std::endl;
        
-        glBindVertexArray(0);
         glUseProgram(0);
 
 
