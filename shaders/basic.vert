@@ -11,8 +11,6 @@ out vec2 TexCoord;
 out vec3 FragPos;
 out vec3 Normal;
 
-out vec4 vertexColor;
-
 void main() {
     FragPos = vec3(uModel * vec4(aPos, 1.0));
     gl_Position = uProjection * uView * vec4(FragPos, 1.0);

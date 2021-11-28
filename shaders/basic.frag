@@ -55,13 +55,13 @@ void main() {
     vec3 NormalizedNormal = normalize(Normal);
     vec3 ViewDir = normalize(uViewPos - FragPos);
 
-    vec3 Result = CalculateDirLight(DirLight, NormalizedNormal, ViewDir);
+    vec3 Result = CalculateDirLight(uDirLight, NormalizedNormal, ViewDir);
 
     for(int PtLightIdx = 0; PtLightIdx < POINT_LIGHT_COUNT; ++PtLightIdx) {
         Result += CalculatePointLight(uPointLights[PtLightIdx], NormalizedNormal, FragPos, ViewDir);
     }
 
-    FragColor = vec4(Result, 1.0);
+    FragColor = vec4(1.0);
 }
 
 vec3
@@ -73,7 +73,7 @@ CalculateDirLight(DirLight light, vec3 normal, vec3 viewDir) {
     float Specular = pow(max(dot(viewDir, ReflectDir), 0.0), uMaterial.Shininess);
     
     vec3 vAmbient = light.Ambient * vec3(texture(uMaterial.Diffuse, ScaledTexCoord));
-    vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(Material.Diffuse, ScaledTexCoord));
+    vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(uMaterial.Diffuse, ScaledTexCoord));
     vec3 vSpecular = light.Specular * Specular * vec3(texture(uMaterial.Specular, ScaledTexCoord));
     
     return (vAmbient + vDiffuse + vSpecular);
