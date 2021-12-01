@@ -5,8 +5,9 @@
 out vec4 FragColor;
 
 struct Material {
-    sampler2D Diffuse;
-    sampler2D Specular;
+    vec3  Ambient;
+    vec3  Diffuse;
+    vec3  Specular;
     float Shininess;
 };
 
@@ -21,9 +22,9 @@ struct DirLight {
 struct PointLight {
     vec3 Position;
 
-    float Constant;
-    float Linear;
-    float Quadratic;
+    float Kc;
+    float Kl;
+    float Kq;
 
     vec3 Ambient;
     vec3 Diffuse;
@@ -55,11 +56,23 @@ void main() {
     vec3 NormalizedNormal = normalize(Normal);
     vec3 ViewDir = normalize(uViewPos - FragPos);
 
-    vec3 Result = CalculateDirLight(uDirLight, NormalizedNormal, ViewDir);
+    vec3 Result = vec3(0.0f);
+    //vec3 Result = CalculateDirLight(uDirLight, NormalizedNormal, ViewDir);
 
     for(int PtLightIdx = 0; PtLightIdx < POINT_LIGHT_COUNT; ++PtLightIdx) {
         Result += CalculatePointLight(uPointLights[PtLightIdx], NormalizedNormal, FragPos, ViewDir);
     }
+
+    //vec3 Ambient = uPointLights[0].Ambient * uMaterial.Ambient;
+    //vec3 NLightDir = normalize(uPointLights[0].Position - FragPos);
+    //float DiffuseCoefficient = max(dot(NormalizedNormal, NLightDir), 0.0f);
+    //vec3 Diffuse = uPointLights[0].Diffuse * (DiffuseCoefficient * uMaterial.Diffuse);
+
+    //vec3 ReflectDir = reflect(-NLightDir, NormalizedNormal);
+    //float SpecularCoefficient = pow(max(dot(ViewDir, ReflectDir), 0.0f), uMaterial.Shininess);
+    //vec3 Specular = uPointLights[0].Specular * (SpecularCoefficient * uMaterial.Specular);
+    //vec3 Result = Ambient + Diffuse + Specular;
+
 
     FragColor = vec4(Result, 1.0);
 }
@@ -72,9 +85,12 @@ CalculateDirLight(DirLight light, vec3 normal, vec3 viewDir) {
     vec3 ReflectDir = reflect(-LightDir, normal);
     float Specular = pow(max(dot(viewDir, ReflectDir), 0.0), uMaterial.Shininess);
     
-    vec3 vAmbient = light.Ambient * vec3(texture(uMaterial.Diffuse, ScaledTexCoord));
-    vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(uMaterial.Diffuse, ScaledTexCoord));
-    vec3 vSpecular = light.Specular * Specular * vec3(texture(uMaterial.Specular, ScaledTexCoord));
+    //vec3 vAmbient = light.Ambient * vec3(texture(uMaterial.Ambient, ScaledTexCoord));
+    //vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(uMaterial.Diffuse, ScaledTexCoord));
+    //vec3 vSpecular = light.Specular * Specular * vec3(texture(uMaterial.Specular, ScaledTexCoord));
+    vec3 vAmbient = light.Ambient * uMaterial.Ambient;
+    vec3 vDiffuse = light.Diffuse * Diffuse * uMaterial.Diffuse;
+    vec3 vSpecular = light.Specular * Specular * uMaterial.Specular;
     
     return (vAmbient + vDiffuse + vSpecular);
     
@@ -88,12 +104,20 @@ CalculatePointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
     vec3 ReflectDir = reflect(-LightDir, normal);
     float Specular = pow(max(dot(viewDir, ReflectDir), 0.0), uMaterial.Shininess);
 
-    float Distance = length(light.Position - fragPos);
-    float Attenuation = 1.0 / (light.Constant + light.Linear * Distance + light.Quadratic * (Distance * Distance));
+    float Distance = length(light.Position - FragPos);
+    float Attenuation = 1.0 / (light.Kc + light.Kl * Distance + light.Kq * (Distance * Distance));
     
-    vec3 vAmbient = light.Ambient * vec3(texture(uMaterial.Diffuse, ScaledTexCoord));
-    vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(uMaterial.Diffuse, ScaledTexCoord));
-    vec3 vSpecular = light.Specular * Specular * vec3(texture(uMaterial.Specular, ScaledTexCoord));
+    //vec3 vAmbient = light.Ambient * vec3(texture(uMaterial.Ambient, ScaledTexCoord));
+    //vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(uMaterial.Diffuse, ScaledTexCoord));
+    //vec3 vSpecular = light.Specular * Specular * vec3(texture(uMaterial.Specular, ScaledTexCoord));
+    vec3 vAmbient = light.Ambient * uMaterial.Ambient;
+    vec3 vDiffuse = light.Diffuse * Diffuse * uMaterial.Diffuse;
+    vec3 vSpecular = light.Specular * Specular * uMaterial.Specular;
 
-    return ((vAmbient + vDiffuse + vSpecular) * Attenuation);
+    vAmbient *= Attenuation;
+    vDiffuse *= Attenuation;
+    vSpecular *= Attenuation;
+
+    //return ((vAmbient + vDiffuse + vSpecular) * Attenuation);
+    return vAmbient + vDiffuse + vSpecular;
 }

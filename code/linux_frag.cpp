@@ -23,6 +23,7 @@
 #define POSITION_LOCATION 0
 #define TEX_COORD_LOCATION 1
 #define NORMAL_LOCATION 2
+
 #define POINT_LIGHT_COUNT 1
 
 typedef int8_t i8;
@@ -116,17 +117,17 @@ _KeyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action, i32 mods) {
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
-    if(key == GLFW_KEY_A && action == GLFW_PRESS) {
-        State->mCamera->Position -= 5.0f * State->mCamera->Right;
+    if(key == GLFW_KEY_A && action != GLFW_RELEASE) {
+        State->mCamera->Position -= State->mCamera->Speed * State->mCamera->Right;
     }
-    if(key == GLFW_KEY_D && action == GLFW_PRESS) {
-        State->mCamera->Position += 5.0f * State->mCamera->Right;
+    if(key == GLFW_KEY_D && action != GLFW_RELEASE) {
+        State->mCamera->Position += State->mCamera->Speed * State->mCamera->Right;
     }
-    if(key == GLFW_KEY_W && action == GLFW_PRESS) {
-        State->mCamera->Position += 5.0f * State->mCamera->Front;
+    if(key == GLFW_KEY_W && action != GLFW_RELEASE) {
+        State->mCamera->Position += State->mCamera->Speed * State->mCamera->Front;
     }
-    if(key == GLFW_KEY_S && action == GLFW_PRESS) {
-        State->mCamera->Position -= 5.0f * State->mCamera->Front;
+    if(key == GLFW_KEY_S && action != GLFW_RELEASE) {
+        State->mCamera->Position -= State->mCamera->Speed * State->mCamera->Front;
     }
 }
 
@@ -252,13 +253,13 @@ main() {
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     Light PointLight;
-    PointLight.Ambient = glm::vec3(1.0f, 0.0f, 0.0f);
-    PointLight.Diffuse = glm::vec3(1.0f, 0.0f, 0.0f);
+    PointLight.Ambient = glm::vec3(0.3f, 0.0f, 0.0f);
+    PointLight.Diffuse = glm::vec3(0.5f, 0.0f, 0.0f);
     PointLight.Specular = glm::vec3(1.0f);
     PointLight.Kc = 1.0f;
     PointLight.Kl = 0.09f;
-    PointLight.Kq = 0.017f;
-    PointLight.Position = glm::vec3(0.0f, 1.0f, 1.0f);
+    PointLight.Kq = 0.032f;
+    PointLight.Position = glm::vec3(0.0f, 1.0f, 2.0f);
     SetUniform3f(ProgramID, "uPointLights[0].Ambient", PointLight.Ambient);
     SetUniform3f(ProgramID, "uPointLights[0].Diffuse", PointLight.Diffuse);
     SetUniform3f(ProgramID, "uPointLights[0].Specular", PointLight.Specular);
@@ -267,9 +268,10 @@ main() {
     SetUniform1f(ProgramID, "uPointLights[0].Kl", PointLight.Kl);
     SetUniform1f(ProgramID, "uPointLights[0].Kq", PointLight.Kq);
 
-    SetUniform3f(ProgramID, "uMaterial.Diffuse", glm::vec3(1.0f, 0.0f, 0.0f));
-    SetUniform3f(ProgramID, "uMaterial.Specular", glm::vec3(1.0f));
-    SetUniform1f(ProgramID, "uMaterial.Shininess", 64.0f);
+    SetUniform3f(ProgramID, "uMaterial.Ambient", glm::vec3(1.0f, 0.0f, 0.0f));
+    SetUniform3f(ProgramID, "uMaterial.Diffuse", glm::vec3(0.3f, 0.3f, 0.3f));
+    SetUniform3f(ProgramID, "uMaterial.Specular", glm::vec3(0.8f));
+    SetUniform1f(ProgramID, "uMaterial.Shininess", 128.0f);
 
 
     while(!glfwWindowShouldClose(Window)) {
