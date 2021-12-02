@@ -6,6 +6,7 @@ MeshInfo::MeshInfo() {
     mBaseVertex    = 0;
     mBaseIndex     = 0;
     mMaterialIndex = INVALID_MATERIAL;
+    mHasTextures = false;
 }
 
 Model::Model(std::string filename) {
@@ -47,8 +48,8 @@ Model::Load() {
         mTexCoords.reserve(mNumVertices);
         mIndices.reserve(mNumIndices);
 
-        for(u32 MeshIndex = 0; MeshIndex < mMeshes.size(); ++MeshIndex) {
-            Model::ProcessMesh(Scene->mMeshes[MeshIndex]);
+        for(u32 MeshIdx = 0; MeshIdx < mMeshes.size(); ++MeshIdx) {
+            Model::ProcessMesh(Scene, Scene->mMeshes[MeshIdx], MeshIdx);
         }
         // TODO(Jovan): Materials (Textures)
         // NOTE(Jovan): Populate buffers
@@ -80,7 +81,7 @@ Model::Load() {
 }
 
 void
-Model::ProcessMesh(const aiMesh* mesh) {
+Model::ProcessMesh(const aiScene *scene, const aiMesh *mesh, u32 meshIdx) {
     const aiVector3D Zero3D(0.0f, 0.0f, 0.0f);
 
     for(u32 VertexIndex = 0; VertexIndex < mesh->mNumVertices; ++VertexIndex) {
@@ -97,14 +98,34 @@ Model::ProcessMesh(const aiMesh* mesh) {
         mIndices.push_back(Face.mIndices[1]);
         mIndices.push_back(Face.mIndices[2]);
     }
+    aiColor3D MaterialColor;
+    float Shininess;
+    aiMaterial *MeshMaterial = scene->mMaterials[mesh->mMaterialIndex];
+    MeshMaterial->Get(AI_MATKEY_COLOR_AMBIENT, MaterialColor);
+    mMeshes[meshIdx].mMaterial.mAmbient = glm::vec3(MaterialColor.r, MaterialColor.g, MaterialColor.b);
+    MeshMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, MaterialColor);
+    mMeshes[meshIdx].mMaterial.mDiffuse = glm::vec3(MaterialColor.r, MaterialColor.g, MaterialColor.b);
+    MeshMaterial->Get(AI_MATKEY_COLOR_SPECULAR, MaterialColor);
+    mMeshes[meshIdx].mMaterial.mSpecular = glm::vec3(MaterialColor.r, MaterialColor.g, MaterialColor.b);
+    MeshMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, MaterialColor);
+    mMeshes[meshIdx].mMaterial.mEmission = glm::vec3(MaterialColor.r, MaterialColor.g, MaterialColor.b);
+    MeshMaterial->Get(AI_MATKEY_SHININESS, Shininess);
+    mMeshes[meshIdx].mMaterial.mShininess = Shininess;
 }
 
 void
-Model::Render() {
+Model::Render(const ShaderProgram &program) {
     glBindVertexArray(mVAO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mBuffers[INDEX_BUFFER]);
     for(u32 MeshIdx = 0; MeshIdx < mMeshes.size(); ++MeshIdx) {
         // TODO(Jovan): Texture rendering
+        
+        program.SetUniform3f("uMaterial.Ambient", mMeshes[MeshIdx].mMaterial.mAmbient);
+        program.SetUniform3f("uMaterial.Diffuse", mMeshes[MeshIdx].mMaterial.mDiffuse);
+        program.SetUniform3f("uMaterial.Specular", mMeshes[MeshIdx].mMaterial.mSpecular);
+        //program.SetUniform3f("uMaterial.Emission", mMeshes[MeshIdx].mMaterial.mEmission);
+        program.SetUniform1f("uMaterial.Shininess", mMeshes[MeshIdx].mMaterial.mShininess);
+
         glDrawElementsBaseVertex(GL_TRIANGLES,
                 mMeshes[MeshIdx].mNumIndices,
                 GL_UNSIGNED_INT,
