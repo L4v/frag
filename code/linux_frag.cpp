@@ -37,8 +37,9 @@ typedef u32 b32;
 #include "shader.cpp"
 #include "model.cpp"
 
-global i32 G_WWIDTH = 800;
-global i32 G_WHEIGHT = 600;
+internal i32 _WindowWidth = 800;
+internal i32 _WindowHeight = 600;
+internal bool _FirstMouse = true;
 
 struct Light {
     glm::vec3 Position;
@@ -53,48 +54,119 @@ struct Light {
     glm::vec3 Specular;
 };
 
-struct Camera {
-    r32       FOV;
-    r32       Pitch;
-    r32       Yaw;
-    r32       Speed;
+class Camera {
+public:
+    enum ECameraMoveDirection {
+        MOVE_LEFT  = 0,
+        MOVE_RIGHT,
+        MOVE_FWD,
+        MOVE_BWD,
+        MOVE_UP,
+        MOVE_DOWN
+    };
 
-    glm::vec3 Position;
-    glm::vec3 Target;
-    glm::vec3 Direction;
+    r32       mFOV;
+    r32       mPitch;
+    r32       mYaw;
+    r32       mMoveSpeed;
+    r32       mRotateSpeed;
 
-    glm::vec3 Front;
-    glm::vec3 Up;
-    glm::vec3 Right;
+    glm::vec3 mWorldUp;
+    glm::vec3 mPosition;
+    glm::vec3 mFront;
+    glm::vec3 mUp;
+    glm::vec3 mRight;
 
-    Camera(float fov, float pitch, float yaw, float speed) {
-        // TODO(Jovan): Extract into parameters
-        FOV   = fov;
-        Pitch = pitch;
-        Yaw   = yaw;
-        Speed = speed;
+    Camera(glm::vec3 position, glm::vec3 worldUp, r32 fov, r32 pitch, r32 yaw, r32 moveSpeed, r32 rotateSpeed) {
+        mPosition = position;
+        mWorldUp = worldUp;
+        mFOV   = fov;
+        mPitch = pitch;
+        mYaw   = yaw;
+        mMoveSpeed = moveSpeed;
+        mRotateSpeed = rotateSpeed;
+        _UpdateCameraVectors();
+    }
 
-        Position     = glm::vec3(0.0f, 0.0f, 0.0f);
-        glm::vec3 Up = glm::vec3(0.0f, 1.0f, 0.0f);
-        Target       = glm::vec3(0.0f, 0.0f, -1.0f);
-        Direction    = glm::normalize(Position - Target);
-        Front        = glm::vec3(0.0f, 0.0f, -1.0f);
-        Right        = glm::normalize(glm::cross(Up, Direction));
-        this->Up     = glm::cross(Direction, Right);
+    void
+    Rotate(r32 dx, r32 dy, r32 dt) {
+        dx *= mRotateSpeed;
+        dy *= mRotateSpeed;
+
+        mYaw += dx;
+        mPitch += dy;
+        if(mPitch > 89.0f) {
+            mPitch = 89.0f;
+        }
+        if(mPitch < -89.0f) {
+            mPitch = -89.0f;
+        }
+
+        _UpdateCameraVectors();
+    }
+
+    void
+    Move(ECameraMoveDirection direction, r32 dt) {
+        r32 Velocity = mMoveSpeed * dt;
+
+        if(direction == MOVE_FWD) {
+            mPosition += Velocity * mFront;
+        }
+
+        if(direction == MOVE_BWD) {
+            mPosition -= Velocity * mFront;
+        }
+
+        if(direction == MOVE_LEFT) {
+            mPosition -= Velocity * mRight;
+        }
+
+        if(direction == MOVE_RIGHT) {
+            mPosition += Velocity * mRight;
+        }
+    }
+
+private:
+    void
+    _UpdateCameraVectors() {
+        mFront.x = cos(glm::radians(mYaw)) * cos(glm::radians(mPitch));
+        mFront.y = sin(glm::radians(mPitch));
+        mFront.z = sin(glm::radians(mYaw)) * cos(glm::radians(mPitch));
+        mFront = glm::normalize(mFront);
+        mRight = glm::normalize(glm::cross(mFront, mWorldUp));
+        mUp = glm::normalize(glm::cross(mRight, mFront));
     }
 };
 
 struct EngineState {
-    Camera *mCamera;
+    Camera    *mCamera;
+    glm::mat4 mProjection;
+    glm::vec2 mCursorPos;
+    r32       mDT;
+    bool      mLeftMouse;
 
     EngineState(Camera *camera) {
         mCamera = camera;
+        mProjection = glm::mat4(1.0f);
+        mCursorPos = glm::vec2(0.0f, 0.0f);
+        mDT = 0.0f;
+        mLeftMouse = false;
     }
 };
 
 internal void
 _ErrorCallback(int error, const char* description) {
     std::cerr << "[Err] GLFW: " << description << std::endl;
+}
+
+internal void
+_WindowSizeCallback(GLFWwindow *window, i32 width, i32 height) {
+    EngineState *State = (EngineState*) glfwGetWindowUserPointer(window);
+    _WindowWidth = width;
+    _WindowHeight = height;
+    glViewport(0, 0, width, height);
+    State->mProjection = glm::perspective(glm::radians(45.0f), _WindowWidth / (r32) _WindowHeight, 0.1f, 100.0f);
+
 }
 
 internal void
@@ -105,16 +177,46 @@ _KeyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action, i32 mods) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
     if(key == GLFW_KEY_A && action != GLFW_RELEASE) {
-        State->mCamera->Position -= State->mCamera->Speed * State->mCamera->Right;
+        State->mCamera->Move(Camera::MOVE_LEFT, State->mDT);
     }
     if(key == GLFW_KEY_D && action != GLFW_RELEASE) {
-        State->mCamera->Position += State->mCamera->Speed * State->mCamera->Right;
+        State->mCamera->Move(Camera::MOVE_RIGHT, State->mDT);
     }
     if(key == GLFW_KEY_W && action != GLFW_RELEASE) {
-        State->mCamera->Position += State->mCamera->Speed * State->mCamera->Front;
+        State->mCamera->Move(Camera::MOVE_FWD, State->mDT);
     }
     if(key == GLFW_KEY_S && action != GLFW_RELEASE) {
-        State->mCamera->Position -= State->mCamera->Speed * State->mCamera->Front;
+        State->mCamera->Move(Camera::MOVE_BWD, State->mDT);
+    }
+}
+
+internal void
+_CursorPosCallback(GLFWwindow *window, r64 xNew, r64 yNew) {
+    EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
+    if(_FirstMouse) {
+        State->mCursorPos.x = xNew;
+        State->mCursorPos.y = yNew;
+        _FirstMouse = false;
+    }
+    r32 dx = State->mCursorPos.x - xNew;
+    r32 dy = yNew - State->mCursorPos.y;
+
+    if(State->mLeftMouse) {
+        State->mCamera->Rotate(dx, dy, State->mDT);
+    }
+
+    State->mCursorPos.x = xNew;
+    State->mCursorPos.y = yNew;
+}
+
+internal void
+_MouseButtonCallback(GLFWwindow *window, i32 button, i32 action, i32 mods) {
+    EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
+    if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+        State->mLeftMouse = true;
+    }
+    if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+        State->mLeftMouse = false;
     }
 }
 
@@ -122,20 +224,24 @@ i32
 main() {
 
     if(!glfwInit()) {
-        std::cout << "Failed to init GLFW" << std::endl;
+        std::cerr << "Failed to init GLFW" << std::endl;
         return -1;
     }
     glfwSetErrorCallback(_ErrorCallback);
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    GLFWwindow *Window = glfwCreateWindow(G_WWIDTH, G_WHEIGHT, "Frag!", 0, 0);
+    GLFWwindow *Window = glfwCreateWindow(_WindowWidth, _WindowHeight, "Frag!", 0, 0);
     if(!Window) {
         std::cerr << "[Err] GLFW: Failed creating window" << std::endl;
         glfwTerminate();
         return -1;
     }
+    glfwSetWindowSizeCallback(Window, _WindowSizeCallback);
     glfwSetKeyCallback(Window, _KeyCallback);
+    glfwSetMouseButtonCallback(Window, _MouseButtonCallback);
+    glfwSetCursorPosCallback(Window, _CursorPosCallback);
+
     glfwMakeContextCurrent(Window);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
     glfwSwapInterval(1);
@@ -149,25 +255,25 @@ main() {
 
 
     // NOTE(Jovan): Camera init
-    Camera Camera(45.0f, 0.0f, -90.0f, 0.05f);
-    EngineState State(&Camera);
+    Camera FPSCamera(glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f), 45.0f, 0.0f, -90.0f, 5.0f, 0.03f);
+    EngineState State(&FPSCamera);
     glfwSetWindowUserPointer(Window, &State);
 
-    glm::mat4 Projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
+    State.mProjection = glm::perspective(glm::radians(45.0f), _WindowWidth / (r32) _WindowHeight, 0.1f, 100.0f);
     glm::mat4 View = glm::mat4(1.0f);
     View = glm::translate(View, glm::vec3(0.0f, 0.0f, -3.0f));
-    View = glm::lookAt(Camera.Position, Camera.Position + Camera.Front, Camera.Up);
+    View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mPosition + State.mCamera->mFront, State.mCamera->mUp);
     glm::mat4 Model = glm::mat4(1.0f);
 
     // NOTE(Jovan): Set texture scale
     glUseProgram(Shader.mId);
     Shader.SetUniform1f("uTexScale", 1.0f);
-    Shader.SetUniform4m("uProjection", Projection);
+    Shader.SetUniform4m("uProjection", State.mProjection);
     Shader.SetUniform4m("uView", View);
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClearColor(0x34 / (r32) 255, 0x49 / (r32) 255, 0x5e / (r32) 255, 1.0f);
 
     Light PointLight;
     PointLight.Ambient = glm::vec3(0.3f);
@@ -190,20 +296,25 @@ main() {
     //Shader.SetUniform3f("uMaterial.Specular", glm::vec3(0.8f));
     //Shader.SetUniform1f("uMaterial.Shininess", 128.0f);
 
+    r32 StartTime = glfwGetTime();
+    r32 EndTime = glfwGetTime();
+    State.mDT = EndTime - StartTime;
 
     while(!glfwWindowShouldClose(Window)) {
-        glfwGetFramebufferSize(Window, &G_WWIDTH, &G_WHEIGHT);
-        r32 AspectRatio = G_WWIDTH / (float) G_WHEIGHT;
-        glViewport(0, 0, G_WWIDTH, G_WHEIGHT);
+        StartTime = glfwGetTime();
+        glfwGetFramebufferSize(Window, &_WindowWidth, &_WindowHeight);
+        r32 AspectRatio = _WindowWidth / (r32) _WindowHeight;
+        glViewport(0, 0, _WindowWidth, _WindowHeight);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(Shader.mId);
 
-        Shader.SetUniform3f("uViewPos", Camera.Position);
+        Shader.SetUniform4m("uProjection", State.mProjection);
+        Shader.SetUniform3f("uViewPos", State.mCamera->mPosition);
 
         View = glm::mat4(1.0f);
         View = glm::translate(View, glm::vec3(0.0f, 0.0f, -3.0f));
-        View = glm::lookAt(Camera.Position, Camera.Position + Camera.Front, Camera.Up);
+        View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mPosition + State.mCamera->mFront, State.mCamera->mUp);
         Shader.SetUniform4m("uView", View);
 
         Model = glm::mat4(1.0f);
@@ -213,10 +324,13 @@ main() {
 
         // NOTE(Jovan): Render model
         Amongus.Render(Shader);
-        std::cout << "Camera pos: " << State.mCamera->Position.x << " " << State.mCamera->Position.z << std::endl;
+        std::cout << "Camera pos: " << State.mCamera->mPosition.x << " " << State.mCamera->mPosition.z << std::endl;
+        std::cout << "Camera up: " << State.mCamera->mUp.x << " " << State.mCamera->mUp.y << std::endl;
+        std::cout << "Camera right: " << State.mCamera->mRight.x << " " << State.mCamera->mRight.z << std::endl;
        
         glUseProgram(0);
-
+        EndTime = glfwGetTime();
+        State.mDT = EndTime - StartTime;
 
         glfwSwapBuffers(Window);
         glfwPollEvents();

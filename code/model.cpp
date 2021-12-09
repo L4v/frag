@@ -32,7 +32,7 @@ Model::Load() {
         Result = false;
     } else {
         mMeshes.resize(Scene->mNumMeshes);
-        // TODO(Jovan): Resize mTextures
+        mTextures.resize(Scene->mNumMaterials);
         for(u32 MeshIndex = 0; MeshIndex < mMeshes.size(); ++MeshIndex) {
             mMeshes[MeshIndex].mMaterialIndex = Scene->mMeshes[MeshIndex]->mMaterialIndex;
             mMeshes[MeshIndex].mNumIndices = Scene->mMeshes[MeshIndex]->mNumFaces * 3;
@@ -98,6 +98,8 @@ Model::ProcessMesh(const aiScene *scene, const aiMesh *mesh, u32 meshIdx) {
         mIndices.push_back(Face.mIndices[1]);
         mIndices.push_back(Face.mIndices[2]);
     }
+
+    // NOTE(Jovan): Load material data
     aiColor3D MaterialColor;
     float Shininess;
     aiMaterial *MeshMaterial = scene->mMaterials[mesh->mMaterialIndex];
