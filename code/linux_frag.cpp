@@ -205,7 +205,7 @@ _CursorPosCallback(GLFWwindow *window, r64 xNew, r64 yNew) {
     r32 dx = State->mCursorPos.x - xNew;
     r32 dy = yNew - State->mCursorPos.y;
 
-    if(State->mLeftMouse) {
+    if(State->mLeftMouse && !ImGui::GetIO().WantCaptureMouse) {
         State->mCamera->Rotate(dx, dy, State->mDT);
     }
 
@@ -252,7 +252,7 @@ main() {
 
     // NOTE(Jovan): Init imgui
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
+    //ImGuiIO& IO = ImGui::GetIO();
     ImGui_ImplGlfw_InitForOpenGL(Window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
