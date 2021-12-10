@@ -11,6 +11,10 @@
 #include <algorithm>
 #include <Magick++.h>
 
+#include "include/imgui/imgui.h"
+#include "include/imgui/imgui_impl_glfw.h"
+#include "include/imgui/imgui_impl_opengl3.h"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -160,7 +164,7 @@ _ErrorCallback(int error, const char* description) {
 }
 
 internal void
-_WindowSizeCallback(GLFWwindow *window, i32 width, i32 height) {
+_FramebufferSizeCallback(GLFWwindow *window, i32 width, i32 height) {
     EngineState *State = (EngineState*) glfwGetWindowUserPointer(window);
     _WindowWidth = width;
     _WindowHeight = height;
@@ -237,7 +241,7 @@ main() {
         glfwTerminate();
         return -1;
     }
-    glfwSetWindowSizeCallback(Window, _WindowSizeCallback);
+    glfwSetFramebufferSizeCallback(Window, _FramebufferSizeCallback);
     glfwSetKeyCallback(Window, _KeyCallback);
     glfwSetMouseButtonCallback(Window, _MouseButtonCallback);
     glfwSetCursorPosCallback(Window, _CursorPosCallback);
@@ -245,6 +249,12 @@ main() {
     glfwMakeContextCurrent(Window);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
     glfwSwapInterval(1);
+
+    // NOTE(Jovan): Init imgui
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    ImGui_ImplGlfw_InitForOpenGL(Window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
 
     ShaderProgram Shader("../shaders/basic.vert", "../shaders/basic.frag");
 
@@ -301,6 +311,12 @@ main() {
     State.mDT = EndTime - StartTime;
 
     while(!glfwWindowShouldClose(Window)) {
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::Text("Hellooooo");
+
         StartTime = glfwGetTime();
         glfwGetFramebufferSize(Window, &_WindowWidth, &_WindowHeight);
         r32 AspectRatio = _WindowWidth / (r32) _WindowHeight;
@@ -329,6 +345,10 @@ main() {
         std::cout << "Camera right: " << State.mCamera->mRight.x << " " << State.mCamera->mRight.z << std::endl;
        
         glUseProgram(0);
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         EndTime = glfwGetTime();
         State.mDT = EndTime - StartTime;
 
@@ -336,6 +356,9 @@ main() {
         glfwPollEvents();
     }
 
+    ImGui_ImplGlfw_Shutdown();
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui::DestroyContext();
     glfwDestroyWindow(Window);
     glfwTerminate();
     return 0;
