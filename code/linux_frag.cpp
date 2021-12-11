@@ -252,28 +252,28 @@ main() {
 
     // NOTE(Jovan): Init imgui
     ImGui::CreateContext();
-    //ImGuiIO& IO = ImGui::GetIO();
     ImGui_ImplGlfw_InitForOpenGL(Window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
     ShaderProgram Shader("../shaders/basic.vert", "../shaders/basic.frag");
 
-    Model Amongus("../res/models/amongus.obj");
+    //Model Amongus("../res/models/amongus.obj");
+    Model Amongus("../res/models/Low Poly Cars (Free)_fbx/Models/car_1.fbx");
     if(!Amongus.Load()) {
         std::cerr << "[Err] Failed to load amongus.obj" << std::endl;
     }
-
+    Amongus.mPosition = glm::vec3(0.0f);
+    Amongus.mRotation = glm::vec3(0.0f);
+    Amongus.mScale    = glm::vec3(1e-3f);
 
     // NOTE(Jovan): Camera init
-    Camera FPSCamera(glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f), 45.0f, 0.0f, -90.0f, 5.0f, 0.03f);
+    Camera FPSCamera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), 45.0f, 0.0f, -90.0f, 5.0f, 0.03f);
     EngineState State(&FPSCamera);
     glfwSetWindowUserPointer(Window, &State);
 
     State.mProjection = glm::perspective(glm::radians(45.0f), _WindowWidth / (r32) _WindowHeight, 0.1f, 100.0f);
     glm::mat4 View = glm::mat4(1.0f);
-    View = glm::translate(View, glm::vec3(0.0f, 0.0f, -3.0f));
     View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mPosition + State.mCamera->mFront, State.mCamera->mUp);
-    glm::mat4 Model = glm::mat4(1.0f);
 
     // NOTE(Jovan): Set texture scale
     glUseProgram(Shader.mId);
@@ -315,7 +315,16 @@ main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::Text("Hellooooo");
+        ImGuiWindowFlags Flags = ImGuiWindowFlags_AlwaysAutoResize;
+        ImGui::Begin("Model", NULL, Flags);
+        const std::string LoadedModelText = "Loaded model: " + Amongus.mFilename;
+        ImGui::Text(LoadedModelText.c_str());
+        ImGui::Spacing();
+        ImGui::DragFloat3("Position", &Amongus.mPosition[0], 1e-3f);
+        ImGui::DragFloat3("Rotation", &Amongus.mRotation[0], 1e-1f);
+        ImGui::DragFloat3("Scale", &Amongus.mScale[0], 1e-3f);
+        
+        ImGui::End();
 
         StartTime = glfwGetTime();
         glfwGetFramebufferSize(Window, &_WindowWidth, &_WindowHeight);
@@ -329,20 +338,13 @@ main() {
         Shader.SetUniform3f("uViewPos", State.mCamera->mPosition);
 
         View = glm::mat4(1.0f);
-        View = glm::translate(View, glm::vec3(0.0f, 0.0f, -3.0f));
         View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mPosition + State.mCamera->mFront, State.mCamera->mUp);
         Shader.SetUniform4m("uView", View);
 
-        Model = glm::mat4(1.0f);
-        Model = glm::translate(Model, glm::vec3(0.0f, 0.0f, -3.0f));
-        Model = glm::scale(Model, glm::vec3(0.001f));
-        Shader.SetUniform4m("uModel", Model);
+        Shader.SetUniform4m("uModel", Amongus.mModel);
 
         // NOTE(Jovan): Render model
         Amongus.Render(Shader);
-        std::cout << "Camera pos: " << State.mCamera->mPosition.x << " " << State.mCamera->mPosition.z << std::endl;
-        std::cout << "Camera up: " << State.mCamera->mUp.x << " " << State.mCamera->mUp.y << std::endl;
-        std::cout << "Camera right: " << State.mCamera->mRight.x << " " << State.mCamera->mRight.z << std::endl;
        
         glUseProgram(0);
 

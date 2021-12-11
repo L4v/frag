@@ -20,7 +20,8 @@ public:
     u32 mId;
 
     ShaderProgram(const std::string &vShaderPath, const std::string &fShaderPath);
-    void SetUniform1f(const std::string &uniform, float f) const;
+    void SetUniform1i(const std::string &uniform, i32 i) const;
+    void SetUniform1f(const std::string &uniform, r32 f) const;
     void SetUniform3f(const std::string &uniform, const glm::vec3 &v) const;
     void SetUniform4m(const std::string &uniform, const glm::mat4 &m) const;
 private:

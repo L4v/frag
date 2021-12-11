@@ -62,7 +62,13 @@ ShaderProgram::createBasicProgram(u32 vShader, u32 fShader) {
 }
 
 void
-ShaderProgram::SetUniform1f(const std::string &uniform, float f) const {
+ShaderProgram::SetUniform1i(const std::string &uniform, i32 i) const {
+    glUniform1i(glGetUniformLocation(mId, uniform.c_str()), i);
+}
+
+
+void
+ShaderProgram::SetUniform1f(const std::string &uniform, r32 f) const {
     glUniform1f(glGetUniformLocation(mId, uniform.c_str()), f);
 }
 

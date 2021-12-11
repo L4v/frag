@@ -10,3 +10,7 @@ newmtl wire_177088027
 	Ka 0.6941 0.3451 0.1059
 	Kd 0.6941 0.3451 0.1059
 	Ks 0.3500 0.3500 0.3500
+
+    map_Kd Plastic_4K_Diffuse.jpg
+    norm Plastic_4K_Normal.jpg
+    map_Ks Plastic_4K_Reflect.jpg

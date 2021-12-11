@@ -1,4 +1,6 @@
 SHELL      = /bin/bash
+BUILD_SUCCESS = '\033[1;32m'Build complete for Linux'\033[0m'
+
 BUILD_DIR  = ./build
 SOURCE_DIR = ./code
 IMGUI_DIR  = $(SOURCE_DIR)/include/imgui
@@ -25,14 +27,11 @@ $(BUILD_DIR)/%.o: $(IMGUI_DIR)/%.cpp
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 all: $(BUILD_DIR)/$(EXE)
-	@echo Build complete for Linux
+	@echo -e $(BUILD_SUCCESS)
 
 $(BUILD_DIR)/$(EXE): $(OBJS)
 	$(CC) -o $@ $^ $(GLAD_DIR)/glad.c $(CFLAGS) $(LDFLAGS)
 
 clean:
 	rm -f $(BUILD_DIR)/$(EXE) $(OBJS)
-
-test:
-	@echo $(OBJS)
 

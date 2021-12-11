@@ -4,13 +4,6 @@
 
 out vec4 FragColor;
 
-struct Material {
-    vec3  Ambient;
-    vec3  Diffuse;
-    vec3  Specular;
-    float Shininess;
-};
-
 struct DirLight {
     vec3 Direction;
     
@@ -38,8 +31,9 @@ in vec3 Normal;
 uniform vec3       uViewPos;
 uniform DirLight   uDirLight;
 uniform PointLight uPointLights[POINT_LIGHT_COUNT];
-uniform Material   uMaterial;
 uniform float      uTexScale;
+uniform sampler2D  uDiffuse;
+uniform sampler2D  uSpecular;
 
 vec2 ScaledTexCoord;
 
@@ -72,14 +66,11 @@ CalculateDirLight(DirLight light, vec3 normal, vec3 viewDir) {
     float Diffuse = max(dot(normal, LightDir), 0.0);
     
     vec3 ReflectDir = reflect(-LightDir, normal);
-    float Specular = pow(max(dot(viewDir, ReflectDir), 0.0), uMaterial.Shininess);
+    float Specular = pow(max(dot(viewDir, ReflectDir), 0.0), 128.0f);
     
-    //vec3 vAmbient = light.Ambient * vec3(texture(uMaterial.Ambient, ScaledTexCoord));
-    //vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(uMaterial.Diffuse, ScaledTexCoord));
-    //vec3 vSpecular = light.Specular * Specular * vec3(texture(uMaterial.Specular, ScaledTexCoord));
-    vec3 vAmbient = light.Ambient * uMaterial.Ambient;
-    vec3 vDiffuse = light.Diffuse * Diffuse * uMaterial.Diffuse;
-    vec3 vSpecular = light.Specular * Specular * uMaterial.Specular;
+    vec3 vAmbient = light.Ambient * vec3(texture(uDiffuse, ScaledTexCoord));
+    vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(uDiffuse, ScaledTexCoord));
+    vec3 vSpecular = light.Specular * Specular * vec3(texture(uSpecular, ScaledTexCoord));
     
     return (vAmbient + vDiffuse + vSpecular);
 }
@@ -90,22 +81,14 @@ CalculatePointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
     float Diffuse = max(dot(normal, LightDir), 0.0);
     
     vec3 ReflectDir = reflect(-LightDir, normal);
-    float Specular = pow(max(dot(viewDir, ReflectDir), 0.0), uMaterial.Shininess);
+    float Specular = pow(max(dot(viewDir, ReflectDir), 0.0), 128.0f);
 
     float Distance = length(light.Position - FragPos);
     float Attenuation = 1.0 / (light.Kc + light.Kl * Distance + light.Kq * (Distance * Distance));
     
-    //vec3 vAmbient = light.Ambient * vec3(texture(uMaterial.Ambient, ScaledTexCoord));
-    //vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(uMaterial.Diffuse, ScaledTexCoord));
-    //vec3 vSpecular = light.Specular * Specular * vec3(texture(uMaterial.Specular, ScaledTexCoord));
-    vec3 vAmbient = light.Ambient * uMaterial.Ambient;
-    vec3 vDiffuse = light.Diffuse * Diffuse * uMaterial.Diffuse;
-    vec3 vSpecular = light.Specular * Specular * uMaterial.Specular;
+    vec3 vAmbient = light.Ambient * vec3(texture(uDiffuse, ScaledTexCoord));
+    vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(uDiffuse, ScaledTexCoord));
+    vec3 vSpecular = light.Specular * Specular * vec3(texture(uSpecular, ScaledTexCoord));
 
-    vAmbient *= Attenuation;
-    vDiffuse *= Attenuation;
-    vSpecular *= Attenuation;
-
-    //return ((vAmbient + vDiffuse + vSpecular) * Attenuation);
-    return vAmbient + vDiffuse + vSpecular;
+    return ((vAmbient + vDiffuse + vSpecular) * Attenuation);
 }

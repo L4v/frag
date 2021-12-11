@@ -3,39 +3,42 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <algorithm>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "include/stb_image.h"
 
 #define POSTPROCESS_FLAGS (aiProcess_Triangulate | aiProcess_FlipUVs)
 #define INVALID_MATERIAL 0xFFFFFFFF
 
-class Material {
-public:
-    glm::vec3  mAmbient;
-    glm::vec3  mDiffuse;
-    glm::vec3  mSpecular;
-    glm::vec3  mEmission;
-    float      mShininess;
+struct Texture {
+    enum ETextureType {
+        DIFFUSE = 0,
+        SPECULAR,
+
+        TYPECOUNT
+    };
+
+    u32          mId;
+    ETextureType mType;
+    std::string  mPath;
+    Texture(const std::string &path, ETextureType type);
 };
 
 struct MeshInfo {
-    u32      mNumIndices;
-    u32      mBaseVertex;
-    u32      mBaseIndex;
-    u32      mMaterialIndex;
-    Material mMaterial;
-    bool     mHasTextures;
+    std::vector<Texture>  mTextures;
+    u32                   mNumIndices;
+    u32                   mBaseVertex;
+    u32                   mBaseIndex;
+    u32                   mMaterialIndex;
 
     MeshInfo();
-
-};
-
-// TODO(Jovan): Add textures
-class Texture {
+    void LoadTextures(aiMaterial *material, Texture::ETextureType type, const std::string &dir);
 
 };
 
 class Model {
 private:
-    std::string            mFilename;
     std::vector<glm::vec3> mPositions;
     std::vector<glm::vec2> mTexCoords;
     std::vector<glm::vec3> mNormals;
@@ -48,6 +51,13 @@ private:
     u32                    mNumIndices;
 
 public:
+    std::string            mFilename;
+    std::string            mDirectory;
+    glm::mat4 mModel;
+    glm::vec3 mPosition;
+    glm::vec3 mRotation;
+    glm::vec3 mScale;
+
     Model(std::string filename);
     bool Load();
     void ProcessMesh(const aiScene *scene, const aiMesh *mesh, u32 meshIdx);
