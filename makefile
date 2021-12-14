@@ -7,7 +7,7 @@ IMGUI_DIR  = $(SOURCE_DIR)/include/imgui
 GLAD_DIR   = $(SOURCE_DIR)/libs
 
 EXE      = frag
-SOURCES  = $(SOURCE_DIR)/linux_frag.cpp
+SOURCES  = $(wildcard $(SOURCE_DIR)/*.cpp)
 SOURCES += $(wildcard $(IMGUI_DIR)/*.cpp)
 OBJS     = $(addprefix $(BUILD_DIR)/, $(addsuffix .o, $(basename $(notdir $(SOURCES)))))
 

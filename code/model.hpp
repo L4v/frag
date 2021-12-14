@@ -4,9 +4,14 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <algorithm>
+#include <vector>
+#include <iostream>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "include/stb_image.h"
+#include "include/glad/glad.h"
+
+#include "shader.hpp"
 
 #define POSTPROCESS_FLAGS (aiProcess_Triangulate | aiProcess_FlipUVs)
 #define INVALID_MATERIAL 0xFFFFFFFF

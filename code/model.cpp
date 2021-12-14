@@ -1,5 +1,8 @@
 #include "model.hpp"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "include/stb_image.h"
+
 Texture::Texture(const std::string &path, ETextureType type) {
     mPath = path;
     mType = type;
@@ -149,6 +152,8 @@ Model::ProcessMesh(const aiScene *scene, const aiMesh *mesh, u32 meshIdx) {
     aiMaterial *MeshMaterial = scene->mMaterials[mesh->mMaterialIndex];
 
     if(mesh->mMaterialIndex >= 0) {
+        std::cout << MeshMaterial->GetTextureCount(aiTextureType_DIFFUSE) << std::endl;
+        std::cout << MeshMaterial->GetTextureCount(aiTextureType_SPECULAR) << std::endl;
         mMeshes[meshIdx].LoadTextures(MeshMaterial, Texture::DIFFUSE, mDirectory);
         mMeshes[meshIdx].LoadTextures(MeshMaterial, Texture::SPECULAR, mDirectory);
     }
@@ -167,7 +172,7 @@ Model::Render(const ShaderProgram &program) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mBuffers[INDEX_BUFFER]);
     for(u32 MeshIdx = 0; MeshIdx < mMeshes.size(); ++MeshIdx) {
         MeshInfo &Mesh = mMeshes[MeshIdx];
-        // TODO(Jovan): Texture rendering
+
         for(u32 TexIdx = 0; TexIdx < Mesh.mTextures.size(); ++TexIdx) {
             Texture &Tex = Mesh.mTextures[TexIdx];
             glActiveTexture(GL_TEXTURE0 + TexIdx);

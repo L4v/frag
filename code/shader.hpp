@@ -1,6 +1,14 @@
 #ifndef SHADER_HPP
 #define SHADER_HPP
 
+#include <iostream>
+#include <glm/glm.hpp>
+#include <string>
+#include <fstream>
+
+#include "include/glad/glad.h"
+#include "types.hpp"
+
 #define POSITION_LOCATION 0
 #define TEX_COORD_LOCATION 1
 #define NORMAL_LOCATION 2

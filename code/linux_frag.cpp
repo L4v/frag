@@ -1,14 +1,7 @@
-#include <glm/ext/matrix_clip_space.hpp>
-#include <glm/ext/matrix_transform.hpp>
 #include <iostream>
-#include <cstdint>
 #include "include/glad/glad.h"
 #include <GLFW/glfw3.h>
-#include <fstream>
-#include <streambuf>
-#include <vector>
 #include <string>
-#include <algorithm>
 #include <Magick++.h>
 
 #include "include/imgui/imgui.h"
@@ -17,29 +10,14 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-#define global static
-#define internal static
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
 
 #define ArrayCount(array) (sizeof(array) / sizeof(array[0]))
 
-typedef int8_t i8;
-typedef int16_t i16;
-typedef int32_t i32;
-typedef int64_t i64;
-
-typedef uint8_t u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-
-typedef float r32;
-typedef double r64;
-typedef u32 b32;
-
-#include "shader.cpp"
-#include "model.cpp"
+#include "types.hpp"
+#include "shader.hpp"
+#include "model.hpp"
 
 internal i32 _WindowWidth = 800;
 internal i32 _WindowHeight = 600;
@@ -69,33 +47,59 @@ public:
         MOVE_DOWN
     };
 
-    r32       mFOV;
-    r32       mPitch;
-    r32       mYaw;
-    r32       mMoveSpeed;
-    r32       mRotateSpeed;
+    enum ECameraType {
+        FIRST_PERSON = 0,
+        ORBITAL,
+    };
+
+    r32         mFOV;
+    r32         mPitch;
+    r32         mYaw;
+    r32         mMoveSpeed;
+    r32         mRotateSpeed;
+    r32         mDistance;
+    r32         mZoomSpeed;
+    ECameraType mType;
 
     glm::vec3 mWorldUp;
     glm::vec3 mPosition;
     glm::vec3 mFront;
     glm::vec3 mUp;
     glm::vec3 mRight;
+    glm::vec3 mTarget;
 
-    Camera(glm::vec3 position, glm::vec3 worldUp, r32 fov, r32 pitch, r32 yaw, r32 moveSpeed, r32 rotateSpeed) {
+    // NOTE(Jovan): First person constructor
+    Camera(glm::vec3 position, r32 fov, r32 moveSpeed = 5.0f, r32 rotateSpeed = 3.0f, glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f)) {
+        mType = FIRST_PERSON;
         mPosition = position;
         mWorldUp = worldUp;
         mFOV   = fov;
-        mPitch = pitch;
-        mYaw   = yaw;
         mMoveSpeed = moveSpeed;
         mRotateSpeed = rotateSpeed;
-        _UpdateCameraVectors();
+        mPitch = 0.0f;
+        mYaw = 0.0f;
+        _UpdateVectors();
+    }
+
+    // NOTE(Jovan): Orbital camera constructor
+    Camera(r32 fov, r32 distance, r32 rotateSpeed = 3.0f, r32 zoomSpeed = 2.0f, glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3 target = glm::vec3(0.0f)) {
+        mType = ORBITAL;
+        mFOV = fov;
+        mDistance = distance;
+        // NOTE(Jovan): Invert rotation
+        mRotateSpeed = -rotateSpeed;
+        mZoomSpeed = zoomSpeed;
+        mWorldUp = worldUp;
+        mTarget = target;
+        mPitch = 0.0f;
+        mYaw = 0.0f;
+        _UpdateVectors();
     }
 
     void
     Rotate(r32 dx, r32 dy, r32 dt) {
-        dx *= mRotateSpeed;
-        dy *= mRotateSpeed;
+        dx *= mRotateSpeed * dt;
+        dy *= mRotateSpeed * dt;
 
         mYaw += dx;
         mPitch += dy;
@@ -106,11 +110,15 @@ public:
             mPitch = -89.0f;
         }
 
-        _UpdateCameraVectors();
+        _UpdateVectors();
     }
 
     void
     Move(ECameraMoveDirection direction, r32 dt) {
+        if (mType == ORBITAL) {
+            return;
+        }
+
         r32 Velocity = mMoveSpeed * dt;
 
         if(direction == MOVE_FWD) {
@@ -128,19 +136,37 @@ public:
         if(direction == MOVE_RIGHT) {
             mPosition += Velocity * mRight;
         }
+        _UpdateVectors();
+    }
+
+    void
+    Zoom(r32 dy, r32 dt) {
+        dy *= mZoomSpeed * dt;
+        mDistance -= dy;
+
+        _UpdateVectors();
     }
 
 private:
     void
-    _UpdateCameraVectors() {
-        mFront.x = cos(glm::radians(mYaw)) * cos(glm::radians(mPitch));
-        mFront.y = sin(glm::radians(mPitch));
-        mFront.z = sin(glm::radians(mYaw)) * cos(glm::radians(mPitch));
-        mFront = glm::normalize(mFront);
+    _UpdateVectors() {
+        if(mType == FIRST_PERSON) {
+            mFront.x = cos(glm::radians(mYaw)) * cos(glm::radians(mPitch));
+            mFront.y = sin(glm::radians(mPitch));
+            mFront.z = sin(glm::radians(mYaw)) * cos(glm::radians(mPitch));
+            mFront = glm::normalize(mFront);
+            mTarget = mPosition + mFront;
+        } else {
+            mPosition.x = mDistance * cos(glm::radians(mYaw)) * cos(glm::radians(mPitch));
+            mPosition.y = -mDistance * sin(glm::radians(mPitch));
+            mPosition.z = mDistance * sin(glm::radians(mYaw)) * cos(glm::radians(mPitch));
+            mFront = mTarget - mPosition;
+        }
         mRight = glm::normalize(glm::cross(mFront, mWorldUp));
         mUp = glm::normalize(glm::cross(mRight, mFront));
     }
 };
+
 
 struct EngineState {
     Camera    *mCamera;
@@ -169,7 +195,7 @@ _FramebufferSizeCallback(GLFWwindow *window, i32 width, i32 height) {
     _WindowWidth = width;
     _WindowHeight = height;
     glViewport(0, 0, width, height);
-    State->mProjection = glm::perspective(glm::radians(45.0f), _WindowWidth / (r32) _WindowHeight, 0.1f, 100.0f);
+    State->mProjection = glm::perspective(glm::radians(State->mCamera->mFOV), _WindowWidth / (r32) _WindowHeight, 0.1f, 100.0f);
 
 }
 
@@ -224,6 +250,12 @@ _MouseButtonCallback(GLFWwindow *window, i32 button, i32 action, i32 mods) {
     }
 }
 
+internal void
+_ScrollCallback(GLFWwindow *window, r64 xoffset, r64 yoffset) {
+    EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
+    State->mCamera->Zoom(yoffset, State->mDT);
+}
+
 i32
 main() {
 
@@ -245,6 +277,7 @@ main() {
     glfwSetKeyCallback(Window, _KeyCallback);
     glfwSetMouseButtonCallback(Window, _MouseButtonCallback);
     glfwSetCursorPosCallback(Window, _CursorPosCallback);
+    glfwSetScrollCallback(Window, _ScrollCallback);
 
     glfwMakeContextCurrent(Window);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
@@ -257,8 +290,7 @@ main() {
 
     ShaderProgram Shader("../shaders/basic.vert", "../shaders/basic.frag");
 
-    //Model Amongus("../res/models/amongus.obj");
-    Model Amongus("../res/models/Low Poly Cars (Free)_fbx/Models/car_1.fbx");
+    Model Amongus("../res/models/amongus.obj");
     if(!Amongus.Load()) {
         std::cerr << "[Err] Failed to load amongus.obj" << std::endl;
     }
@@ -267,13 +299,13 @@ main() {
     Amongus.mScale    = glm::vec3(1e-3f);
 
     // NOTE(Jovan): Camera init
-    Camera FPSCamera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), 45.0f, 0.0f, -90.0f, 5.0f, 0.03f);
-    EngineState State(&FPSCamera);
+    Camera OrbitalCamera(45.0f, 2.0f);
+    EngineState State(&OrbitalCamera);
     glfwSetWindowUserPointer(Window, &State);
 
-    State.mProjection = glm::perspective(glm::radians(45.0f), _WindowWidth / (r32) _WindowHeight, 0.1f, 100.0f);
+    State.mProjection = glm::perspective(glm::radians(State.mCamera->mFOV), _WindowWidth / (r32) _WindowHeight, 0.1f, 100.0f);
     glm::mat4 View = glm::mat4(1.0f);
-    View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mPosition + State.mCamera->mFront, State.mCamera->mUp);
+    View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
 
     // NOTE(Jovan): Set texture scale
     glUseProgram(Shader.mId);
@@ -338,7 +370,7 @@ main() {
         Shader.SetUniform3f("uViewPos", State.mCamera->mPosition);
 
         View = glm::mat4(1.0f);
-        View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mPosition + State.mCamera->mFront, State.mCamera->mUp);
+        View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
         Shader.SetUniform4m("uView", View);
 
         Shader.SetUniform4m("uModel", Amongus.mModel);
