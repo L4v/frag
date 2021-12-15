@@ -36,30 +36,15 @@ struct Light {
     glm::vec3 Specular;
 };
 
+// TODO(Jovan): Panning?
 class Camera {
 public:
-    enum ECameraMoveDirection {
-        MOVE_LEFT  = 0,
-        MOVE_RIGHT,
-        MOVE_FWD,
-        MOVE_BWD,
-        MOVE_UP,
-        MOVE_DOWN
-    };
-
-    enum ECameraType {
-        FIRST_PERSON = 0,
-        ORBITAL,
-    };
-
     r32         mFOV;
     r32         mPitch;
     r32         mYaw;
-    r32         mMoveSpeed;
     r32         mRotateSpeed;
     r32         mDistance;
     r32         mZoomSpeed;
-    ECameraType mType;
 
     glm::vec3 mWorldUp;
     glm::vec3 mPosition;
@@ -68,73 +53,32 @@ public:
     glm::vec3 mRight;
     glm::vec3 mTarget;
 
-    // NOTE(Jovan): First person constructor
-    Camera(glm::vec3 position, r32 fov, r32 moveSpeed = 5.0f, r32 rotateSpeed = 3.0f, glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f)) {
-        mType = FIRST_PERSON;
-        mPosition = position;
-        mWorldUp = worldUp;
-        mFOV   = fov;
-        mMoveSpeed = moveSpeed;
-        mRotateSpeed = rotateSpeed;
-        mPitch = 0.0f;
-        mYaw = 0.0f;
-        _UpdateVectors();
-    }
-
     // NOTE(Jovan): Orbital camera constructor
-    Camera(r32 fov, r32 distance, r32 rotateSpeed = 3.0f, r32 zoomSpeed = 2.0f, glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3 target = glm::vec3(0.0f)) {
-        mType = ORBITAL;
+    Camera(r32 fov, r32 distance, r32 rotateSpeed = 8.0f, r32 zoomSpeed = 2.0f, glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3 target = glm::vec3(0.0f)) {
         mFOV = fov;
         mDistance = distance;
-        // NOTE(Jovan): Invert rotation
-        mRotateSpeed = -rotateSpeed;
+        mRotateSpeed = rotateSpeed;
         mZoomSpeed = zoomSpeed;
         mWorldUp = worldUp;
         mTarget = target;
-        mPitch = 0.0f;
+
         mYaw = 0.0f;
+        mPitch = 0.0f;
         _UpdateVectors();
     }
 
     void
-    Rotate(r32 dx, r32 dy, r32 dt) {
-        dx *= mRotateSpeed * dt;
-        dy *= mRotateSpeed * dt;
+    Rotate(r32 dYaw, r32 dPitch, r32 dt) {
+        dYaw *= mRotateSpeed * dt;
+        dPitch *= mRotateSpeed * dt;
 
-        mYaw += dx;
-        mPitch += dy;
+        mYaw -= dYaw;
+        mPitch -= dPitch;
         if(mPitch > 89.0f) {
             mPitch = 89.0f;
         }
         if(mPitch < -89.0f) {
             mPitch = -89.0f;
-        }
-
-        _UpdateVectors();
-    }
-
-    void
-    Move(ECameraMoveDirection direction, r32 dt) {
-        if (mType == ORBITAL) {
-            return;
-        }
-
-        r32 Velocity = mMoveSpeed * dt;
-
-        if(direction == MOVE_FWD) {
-            mPosition += Velocity * mFront;
-        }
-
-        if(direction == MOVE_BWD) {
-            mPosition -= Velocity * mFront;
-        }
-
-        if(direction == MOVE_LEFT) {
-            mPosition -= Velocity * mRight;
-        }
-
-        if(direction == MOVE_RIGHT) {
-            mPosition += Velocity * mRight;
         }
         _UpdateVectors();
     }
@@ -143,6 +87,9 @@ public:
     Zoom(r32 dy, r32 dt) {
         dy *= mZoomSpeed * dt;
         mDistance -= dy;
+        if (mDistance <= 1.0f) {
+            mDistance = 1.0f;
+        }
 
         _UpdateVectors();
     }
@@ -150,18 +97,10 @@ public:
 private:
     void
     _UpdateVectors() {
-        if(mType == FIRST_PERSON) {
-            mFront.x = cos(glm::radians(mYaw)) * cos(glm::radians(mPitch));
-            mFront.y = sin(glm::radians(mPitch));
-            mFront.z = sin(glm::radians(mYaw)) * cos(glm::radians(mPitch));
-            mFront = glm::normalize(mFront);
-            mTarget = mPosition + mFront;
-        } else {
-            mPosition.x = mDistance * cos(glm::radians(mYaw)) * cos(glm::radians(mPitch));
-            mPosition.y = -mDistance * sin(glm::radians(mPitch));
-            mPosition.z = mDistance * sin(glm::radians(mYaw)) * cos(glm::radians(mPitch));
-            mFront = mTarget - mPosition;
-        }
+        mPosition.x = mDistance * cos(glm::radians(mYaw)) * cos(glm::radians(mPitch));
+        mPosition.y = -mDistance * sin(glm::radians(mPitch));
+        mPosition.z = mDistance * sin(glm::radians(mYaw)) * cos(glm::radians(mPitch));
+        mFront = glm::normalize(mTarget - mPosition);
         mRight = glm::normalize(glm::cross(mFront, mWorldUp));
         mUp = glm::normalize(glm::cross(mRight, mFront));
     }
@@ -206,18 +145,6 @@ _KeyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action, i32 mods) {
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
-    if(key == GLFW_KEY_A && action != GLFW_RELEASE) {
-        State->mCamera->Move(Camera::MOVE_LEFT, State->mDT);
-    }
-    if(key == GLFW_KEY_D && action != GLFW_RELEASE) {
-        State->mCamera->Move(Camera::MOVE_RIGHT, State->mDT);
-    }
-    if(key == GLFW_KEY_W && action != GLFW_RELEASE) {
-        State->mCamera->Move(Camera::MOVE_FWD, State->mDT);
-    }
-    if(key == GLFW_KEY_S && action != GLFW_RELEASE) {
-        State->mCamera->Move(Camera::MOVE_BWD, State->mDT);
-    }
 }
 
 internal void
@@ -228,11 +155,12 @@ _CursorPosCallback(GLFWwindow *window, r64 xNew, r64 yNew) {
         State->mCursorPos.y = yNew;
         _FirstMouse = false;
     }
-    r32 dx = State->mCursorPos.x - xNew;
-    r32 dy = yNew - State->mCursorPos.y;
+    r32 DX = State->mCursorPos.x - xNew;
+    r32 DY = yNew - State->mCursorPos.y;
+    bool WantCaptureMouse = ImGui::GetIO().WantCaptureMouse;
 
-    if(State->mLeftMouse && !ImGui::GetIO().WantCaptureMouse) {
-        State->mCamera->Rotate(dx, dy, State->mDT);
+    if(State->mLeftMouse && !WantCaptureMouse) {
+        State->mCamera->Rotate(DX, DY, State->mDT);
     }
 
     State->mCursorPos.x = xNew;
@@ -351,6 +279,14 @@ main() {
         ImGui::Begin("Model", NULL, Flags);
         const std::string LoadedModelText = "Loaded model: " + Amongus.mFilename;
         ImGui::Text(LoadedModelText.c_str());
+        const std::string CameraFront = "Front: " + std::to_string(State.mCamera->mFront.x) + " " + std::to_string(State.mCamera->mFront.y) + " " + std::to_string(State.mCamera->mFront.z);
+        const std::string CameraPos = "Position: " +  std::to_string(State.mCamera->mPosition.x) + " " + std::to_string(State.mCamera->mPosition.y) + " " + std::to_string(State.mCamera->mPosition.z);
+        const std::string CameraTarget = "Target: " + std::to_string(State.mCamera->mTarget.x) + " " +  std::to_string(State.mCamera->mTarget.y) + " " +    std::to_string(State.mCamera->mTarget.z);
+        const std::string CameraYP = "Yaw: " + std::to_string(State.mCamera->mYaw) + " " +  std::to_string(State.mCamera->mPitch);
+        ImGui::Text(CameraFront.c_str());
+        ImGui::Text(CameraPos.c_str());
+        ImGui::Text(CameraTarget.c_str());
+        ImGui::Text(CameraYP.c_str());
         ImGui::Spacing();
         ImGui::DragFloat3("Position", &Amongus.mPosition[0], 1e-3f);
         ImGui::DragFloat3("Rotation", &Amongus.mRotation[0], 1e-1f);
