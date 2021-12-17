@@ -4,24 +4,19 @@
 #include <string>
 #include <Magick++.h>
 
-#include "include/imgui/imgui.h"
-#include "include/imgui/imgui_impl_glfw.h"
-#include "include/imgui/imgui_impl_opengl3.h"
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
-#define ArrayCount(array) (sizeof(array) / sizeof(array[0]))
-
+#include "frag.hpp"
+#include "ui.hpp"
 #include "types.hpp"
 #include "shader.hpp"
 #include "model.hpp"
 
 internal i32 _WindowWidth = 800;
 internal i32 _WindowHeight = 600;
-internal bool _FirstMouse = true;
 
 struct Light {
     glm::vec3 Position;
@@ -36,92 +31,32 @@ struct Light {
     glm::vec3 Specular;
 };
 
-// TODO(Jovan): Panning?
-class Camera {
-public:
-    r32         mFOV;
-    r32         mPitch;
-    r32         mYaw;
-    r32         mRotateSpeed;
-    r32         mDistance;
-    r32         mZoomSpeed;
+void
+_CreateFramebuffer(u32 *fbo, u32 *rbo, u32 *texture, i32 width, i32 height) {
+    // TODO(Jovan): Tidy up
+    glGenFramebuffers(1, fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, *fbo);
 
-    glm::vec3 mWorldUp;
-    glm::vec3 mPosition;
-    glm::vec3 mFront;
-    glm::vec3 mUp;
-    glm::vec3 mRight;
-    glm::vec3 mTarget;
+    glGenTextures(1, texture);
+    glBindTexture(GL_TEXTURE_2D, *texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, (void*)0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *texture, 0);
 
-    // NOTE(Jovan): Orbital camera constructor
-    Camera(r32 fov, r32 distance, r32 rotateSpeed = 8.0f, r32 zoomSpeed = 2.0f, glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3 target = glm::vec3(0.0f)) {
-        mFOV = fov;
-        mDistance = distance;
-        mRotateSpeed = rotateSpeed;
-        mZoomSpeed = zoomSpeed;
-        mWorldUp = worldUp;
-        mTarget = target;
+    glGenRenderbuffers(1, rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, *rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, *rbo);
 
-        mYaw = 0.0f;
-        mPitch = 0.0f;
-        _UpdateVectors();
+    // TODO(Jovan): Check for concrete errors
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "[Err] Framebuffer not complete" << std::endl;
     }
 
-    void
-    Rotate(r32 dYaw, r32 dPitch, r32 dt) {
-        dYaw *= mRotateSpeed * dt;
-        dPitch *= mRotateSpeed * dt;
-
-        mYaw -= dYaw;
-        mPitch -= dPitch;
-        if(mPitch > 89.0f) {
-            mPitch = 89.0f;
-        }
-        if(mPitch < -89.0f) {
-            mPitch = -89.0f;
-        }
-        _UpdateVectors();
-    }
-
-    void
-    Zoom(r32 dy, r32 dt) {
-        dy *= mZoomSpeed * dt;
-        mDistance -= dy;
-        if (mDistance <= 1.0f) {
-            mDistance = 1.0f;
-        }
-
-        _UpdateVectors();
-    }
-
-private:
-    void
-    _UpdateVectors() {
-        mPosition.x = mDistance * cos(glm::radians(mYaw)) * cos(glm::radians(mPitch));
-        mPosition.y = -mDistance * sin(glm::radians(mPitch));
-        mPosition.z = mDistance * sin(glm::radians(mYaw)) * cos(glm::radians(mPitch));
-        mFront = glm::normalize(mTarget - mPosition);
-        mRight = glm::normalize(glm::cross(mFront, mWorldUp));
-        mUp = glm::normalize(glm::cross(mRight, mFront));
-    }
-};
-
-
-struct EngineState {
-    Camera    *mCamera;
-    glm::mat4 mProjection;
-    glm::vec2 mCursorPos;
-    r32       mDT;
-    bool      mLeftMouse;
-
-    EngineState(Camera *camera) {
-        mCamera = camera;
-        mProjection = glm::mat4(1.0f);
-        mCursorPos = glm::vec2(0.0f, 0.0f);
-        mDT = 0.0f;
-        mLeftMouse = false;
-    }
-};
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
 
 internal void
 _ErrorCallback(int error, const char* description) {
@@ -133,9 +68,6 @@ _FramebufferSizeCallback(GLFWwindow *window, i32 width, i32 height) {
     EngineState *State = (EngineState*) glfwGetWindowUserPointer(window);
     _WindowWidth = width;
     _WindowHeight = height;
-    glViewport(0, 0, width, height);
-    State->mProjection = glm::perspective(glm::radians(State->mCamera->mFOV), _WindowWidth / (r32) _WindowHeight, 0.1f, 100.0f);
-
 }
 
 internal void
@@ -150,21 +82,6 @@ _KeyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action, i32 mods) {
 internal void
 _CursorPosCallback(GLFWwindow *window, r64 xNew, r64 yNew) {
     EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
-    if(_FirstMouse) {
-        State->mCursorPos.x = xNew;
-        State->mCursorPos.y = yNew;
-        _FirstMouse = false;
-    }
-    r32 DX = State->mCursorPos.x - xNew;
-    r32 DY = yNew - State->mCursorPos.y;
-    bool WantCaptureMouse = ImGui::GetIO().WantCaptureMouse;
-
-    if(State->mLeftMouse && !WantCaptureMouse) {
-        State->mCamera->Rotate(DX, DY, State->mDT);
-    }
-
-    State->mCursorPos.x = xNew;
-    State->mCursorPos.y = yNew;
 }
 
 internal void
@@ -181,7 +98,9 @@ _MouseButtonCallback(GLFWwindow *window, i32 button, i32 action, i32 mods) {
 internal void
 _ScrollCallback(GLFWwindow *window, r64 xoffset, r64 yoffset) {
     EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
-    State->mCamera->Zoom(yoffset, State->mDT);
+    if(State->mSceneWindowFocused) {
+        State->mCamera->Zoom(yoffset, State->mDT);
+    }
 }
 
 i32
@@ -212,9 +131,7 @@ main() {
     glfwSwapInterval(1);
 
     // NOTE(Jovan): Init imgui
-    ImGui::CreateContext();
-    ImGui_ImplGlfw_InitForOpenGL(Window, true);
-    ImGui_ImplOpenGL3_Init("#version 330");
+    InitUI(Window);
 
     ShaderProgram Shader("../shaders/basic.vert", "../shaders/basic.frag");
 
@@ -231,7 +148,7 @@ main() {
     EngineState State(&OrbitalCamera);
     glfwSetWindowUserPointer(Window, &State);
 
-    State.mProjection = glm::perspective(glm::radians(State.mCamera->mFOV), _WindowWidth / (r32) _WindowHeight, 0.1f, 100.0f);
+    State.mProjection = glm::perspective(glm::radians(State.mCamera->mFOV), State.mFramebufferSize.x / (r32) State.mFramebufferSize.y, 0.1f, 100.0f);
     glm::mat4 View = glm::mat4(1.0f);
     View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
 
@@ -240,10 +157,6 @@ main() {
     Shader.SetUniform1f("uTexScale", 1.0f);
     Shader.SetUniform4m("uProjection", State.mProjection);
     Shader.SetUniform4m("uView", View);
-
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glClearColor(0x34 / (r32) 255, 0x49 / (r32) 255, 0x5e / (r32) 255, 1.0f);
 
     Light PointLight;
     PointLight.Ambient = glm::vec3(0.3f);
@@ -266,41 +179,42 @@ main() {
     //Shader.SetUniform3f("uMaterial.Specular", glm::vec3(0.8f));
     //Shader.SetUniform1f("uMaterial.Shininess", 128.0f);
 
+    u32 FBO, RBO;
+    _CreateFramebuffer(&FBO, &RBO, &State.mFBOTexture, State.mFramebufferSize.x, State.mFramebufferSize.y);
+
     r32 StartTime = glfwGetTime();
     r32 EndTime = glfwGetTime();
     State.mDT = EndTime - StartTime;
 
-    while(!glfwWindowShouldClose(Window)) {
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
+    u32 OldFBO;
+    u32 OldRBO;
+    u32 OldFBOTexture;
 
-        ImGuiWindowFlags Flags = ImGuiWindowFlags_AlwaysAutoResize;
-        ImGui::Begin("Model", NULL, Flags);
-        const std::string LoadedModelText = "Loaded model: " + Amongus.mFilename;
-        ImGui::Text(LoadedModelText.c_str());
-        const std::string CameraFront = "Front: " + std::to_string(State.mCamera->mFront.x) + " " + std::to_string(State.mCamera->mFront.y) + " " + std::to_string(State.mCamera->mFront.z);
-        const std::string CameraPos = "Position: " +  std::to_string(State.mCamera->mPosition.x) + " " + std::to_string(State.mCamera->mPosition.y) + " " + std::to_string(State.mCamera->mPosition.z);
-        const std::string CameraTarget = "Target: " + std::to_string(State.mCamera->mTarget.x) + " " +  std::to_string(State.mCamera->mTarget.y) + " " +    std::to_string(State.mCamera->mTarget.z);
-        const std::string CameraYP = "Yaw: " + std::to_string(State.mCamera->mYaw) + " " +  std::to_string(State.mCamera->mPitch);
-        ImGui::Text(CameraFront.c_str());
-        ImGui::Text(CameraPos.c_str());
-        ImGui::Text(CameraTarget.c_str());
-        ImGui::Text(CameraYP.c_str());
-        ImGui::Spacing();
-        ImGui::DragFloat3("Position", &Amongus.mPosition[0], 1e-3f);
-        ImGui::DragFloat3("Rotation", &Amongus.mRotation[0], 1e-1f);
-        ImGui::DragFloat3("Scale", &Amongus.mScale[0], 1e-3f);
-        
-        ImGui::End();
+    ImGuiWindowFlags MainWindowFlags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar
+        | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus
+        | ImGuiWindowFlags_NoFocusOnAppearing;
+    MainWindow Main("Main", MainWindowFlags);
+
+    while(!glfwWindowShouldClose(Window)) {
 
         StartTime = glfwGetTime();
-        glfwGetFramebufferSize(Window, &_WindowWidth, &_WindowHeight);
-        r32 AspectRatio = _WindowWidth / (r32) _WindowHeight;
-        glViewport(0, 0, _WindowWidth, _WindowHeight);
-
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
         glUseProgram(Shader.mId);
+        if(Main.mSceneWindow->mHasResized) {
+            std::cout << "Resizing" << std::endl;
+            OldFBO = FBO;
+            OldFBOTexture = State.mFBOTexture;
+            OldRBO = RBO;
+
+            _CreateFramebuffer(&FBO, &RBO, &State.mFBOTexture, State.mFramebufferSize.x, State.mFramebufferSize.y);
+            glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+            State.mProjection = glm::perspective(glm::radians(State.mCamera->mFOV), State.mFramebufferSize.x / (r32) State.mFramebufferSize.y, 0.1f, 100.0f);
+
+            glDeleteFramebuffers(1, &OldFBO);
+            glDeleteRenderbuffers(1, &OldRBO);
+            glDeleteTextures(1, &OldFBOTexture);
+            Main.mSceneWindow->mHasResized = false;
+        }
 
         Shader.SetUniform4m("uProjection", State.mProjection);
         Shader.SetUniform3f("uViewPos", State.mCamera->mPosition);
@@ -311,13 +225,42 @@ main() {
 
         Shader.SetUniform4m("uModel", Amongus.mModel);
 
+        glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glClearColor(0x34 / (r32) 255, 0x49 / (r32) 255, 0x5e / (r32) 255, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glViewport(0, 0, State.mFramebufferSize.x, State.mFramebufferSize.y);
         // NOTE(Jovan): Render model
         Amongus.Render(Shader);
        
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glViewport(0, 0, _WindowWidth, _WindowHeight);
         glUseProgram(0);
 
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        NewFrameUI();
+
+        Main.Render(&State, _WindowWidth, _WindowHeight);
+
+        ImGui::Begin("Model", NULL, ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::Text("Loaded model: %s", Amongus.mFilename.c_str());
+        ImGui::Spacing();
+        ImGui::DragFloat3("Position", &Amongus.mPosition[0], 1e-3f);
+        ImGui::DragFloat3("Rotation", &Amongus.mRotation[0], 1e-1f);
+        ImGui::DragFloat3("Scale", &Amongus.mScale[0], 1e-3f);
+        ImGui::End();
+
+        ImGui::Begin("Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::Text("Position: %.2f, %.2f, %.2f", State.mCamera->mPosition.x, State.mCamera->mPosition.y, State.mCamera->mPosition.z);
+        ImGui::Text("Pitch: %.2f", State.mCamera->mPitch * 180.0f / PI);
+        ImGui::Text("Yaw: %.2f", State.mCamera->mYaw * 180.0f / PI);
+        ImGui::End();
+
+        RenderUI();
 
         EndTime = glfwGetTime();
         State.mDT = EndTime - StartTime;
@@ -326,9 +269,7 @@ main() {
         glfwPollEvents();
     }
 
-    ImGui_ImplGlfw_Shutdown();
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui::DestroyContext();
+    DisposeUI();
     glfwDestroyWindow(Window);
     glfwTerminate();
     return 0;
