@@ -28,11 +28,26 @@ DisposeUI() {
     ImGui::DestroyContext();
 }
 
+ModelWindow::ModelWindow(const std::string &name, ImGuiWindowFlags flags) {
+    mName = name;
+    mFlags = flags;
+}
+
+void
+ModelWindow::Render(const std::string &filename, r32 *position, r32 *rotation, r32 *scale) {
+    ImGui::Begin(mName.c_str(), NULL, mFlags);
+    ImGui::Text("Loaded model: %s", filename.c_str());
+    ImGui::Spacing();
+    ImGui::DragFloat3("Position", position, 1e-3f);
+    ImGui::DragFloat3("Rotation", rotation, 1e-1f);
+    ImGui::DragFloat3("Scale", scale, 1e-3f);
+    ImGui::End();
+}
+
 MainWindow::MainWindow(const std::string &name, ImGuiWindowFlags flags) {
     mName = name;
     mFlags = flags;
     mInitialized = false;
-    mSceneWindow = new SceneWindow("Scene", ImGuiWindowFlags_AlwaysAutoResize);
 }
 
 void
@@ -58,8 +73,6 @@ MainWindow::Render(EngineState *state, i32 width, i32 height) {
         ImGui::DockBuilderFinish(DockID);
         mInitialized = true;
     }
-
-    mSceneWindow->Render(state);
 
     ImGui::End();
 }

@@ -13,6 +13,16 @@ void NewFrameUI();
 void RenderUI();
 void DisposeUI();
 
+class ModelWindow {
+public:
+    ImGuiWindowFlags mFlags;
+    std::string      mName;
+
+    ModelWindow(const std::string &name, ImGuiWindowFlags flags);
+    void Render(const std::string &filename, r32 *position, r32 *rotation, r32 *scale);
+
+};
+
 class SceneWindow {
 public:
     ImGuiWindowFlags mFlags;
@@ -28,7 +38,6 @@ public:
     std::string      mName;
     ImGuiWindowFlags mFlags;
     bool             mInitialized;
-    SceneWindow     *mSceneWindow;
 
     MainWindow(const std::string &name, ImGuiWindowFlags flags);
     void Render(EngineState *state, i32 width, i32 height);

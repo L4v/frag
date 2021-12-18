@@ -194,13 +194,15 @@ main() {
         | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus
         | ImGuiWindowFlags_NoFocusOnAppearing;
     MainWindow Main("Main", MainWindowFlags);
+    SceneWindow Scene("Scene", ImGuiWindowFlags_AlwaysAutoResize);
+    ModelWindow ModelWindow("Model", ImGuiWindowFlags_AlwaysAutoResize);
 
     while(!glfwWindowShouldClose(Window)) {
 
         StartTime = glfwGetTime();
         
         glUseProgram(Shader.mId);
-        if(Main.mSceneWindow->mHasResized) {
+        if(Scene.mHasResized) {
             std::cout << "Resizing" << std::endl;
             OldFBO = FBO;
             OldFBOTexture = State.mFBOTexture;
@@ -213,7 +215,7 @@ main() {
             glDeleteFramebuffers(1, &OldFBO);
             glDeleteRenderbuffers(1, &OldRBO);
             glDeleteTextures(1, &OldFBOTexture);
-            Main.mSceneWindow->mHasResized = false;
+            Scene.mHasResized = false;
         }
 
         Shader.SetUniform4m("uProjection", State.mProjection);
@@ -245,14 +247,8 @@ main() {
         NewFrameUI();
 
         Main.Render(&State, _WindowWidth, _WindowHeight);
-
-        ImGui::Begin("Model", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::Text("Loaded model: %s", Amongus.mFilename.c_str());
-        ImGui::Spacing();
-        ImGui::DragFloat3("Position", &Amongus.mPosition[0], 1e-3f);
-        ImGui::DragFloat3("Rotation", &Amongus.mRotation[0], 1e-1f);
-        ImGui::DragFloat3("Scale", &Amongus.mScale[0], 1e-3f);
-        ImGui::End();
+        Scene.Render(&State);
+        ModelWindow.Render(Amongus.mFilename, &Amongus.mPosition[0], &Amongus.mRotation[0], &Amongus.mScale[0]);
 
         ImGui::Begin("Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::Text("Position: %.2f, %.2f, %.2f", State.mCamera->mPosition.x, State.mCamera->mPosition.y, State.mCamera->mPosition.z);
