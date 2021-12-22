@@ -78,6 +78,6 @@ ShaderProgram::SetUniform3f(const std::string &uniform, const glm::vec3 &v) cons
 }
 
 void
-ShaderProgram::SetUniform4m(const std::string &uniform, const glm::mat4 &m) const {
-    glUniformMatrix4fv(glGetUniformLocation(mId, uniform.c_str()), 1, GL_FALSE, &m[0][0]);
+ShaderProgram::SetUniform4m(const std::string &uniform, const glm::mat4 &m, GLboolean transpose) const {
+    glUniformMatrix4fv(glGetUniformLocation(mId, uniform.c_str()), 1, transpose, &m[0][0]);
 }

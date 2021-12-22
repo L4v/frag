@@ -13,7 +13,6 @@ OBJS     = $(addprefix $(BUILD_DIR)/, $(addsuffix .o, $(basename $(notdir $(SOUR
 
 CC       = g++
 CFLAGS   = -I$(SOURCE_DIR)/include
-CFLAGS  += `Magick++-config --cxxflags`
 CFLAGS  += -DIMGUI_IMPL_OPENGL_LOADER_GLAD
 LDFLAGS  = -ldl
 LDFLAGS += `pkg-config --libs glfw3`

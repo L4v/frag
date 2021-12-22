@@ -2,7 +2,6 @@
 #include "include/glad/glad.h"
 #include <GLFW/glfw3.h>
 #include <string>
-#include <Magick++.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -103,6 +102,44 @@ _ScrollCallback(GLFWwindow *window, r64 xoffset, r64 yoffset) {
     }
 }
 
+void
+RenderModel(Model &model, ShaderProgram &program) {
+    model.mModel = glm::mat4(1.0f);
+    model.mModel = glm::translate(model.mModel, model.mPosition);
+    model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+    model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+    model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+    model.mModel = glm::scale(model.mModel, model.mScale);
+
+    glBindVertexArray(model.mVAO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model.mBuffers[INDEX_BUFFER]);
+    for(u32 MeshIdx = 0; MeshIdx < model.mMeshes.size(); ++MeshIdx) {
+        MeshInfo &Mesh = model.mMeshes[MeshIdx];
+
+        for(u32 TexIdx = 0; TexIdx < Mesh.mTextures.size(); ++TexIdx) {
+            Texture &Tex = Mesh.mTextures[TexIdx];
+            glActiveTexture(GL_TEXTURE0 + TexIdx);
+            // TODO(Jovan): Multiple same-type texture support
+            if(Tex.mType == Texture::DIFFUSE) {
+                program.SetUniform1i("uDiffuse", TexIdx);
+            } else if (Tex.mType == Texture::SPECULAR) {
+                program.SetUniform1i("uSpecular", TexIdx);
+            }
+            glBindTexture(GL_TEXTURE_2D, Tex.mId);
+        }
+
+        glDrawElementsBaseVertex(GL_TRIANGLES,
+                model.mMeshes[MeshIdx].mNumIndices,
+                GL_UNSIGNED_INT,
+                (void*)(sizeof(u32) * model.mMeshes[MeshIdx].mBaseIndex),
+                model.mMeshes[MeshIdx].mBaseVertex);
+
+        glActiveTexture(GL_TEXTURE0);
+    }
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
 i32
 main() {
 
@@ -133,15 +170,15 @@ main() {
     // NOTE(Jovan): Init imgui
     InitUI(Window);
 
-    ShaderProgram Shader("../shaders/basic.vert", "../shaders/basic.frag");
+    ShaderProgram Phong("../shaders/basic.vert", "../shaders/basic.frag");
 
-    Model Amongus("../res/models/amongus.obj");
-    if(!Amongus.Load()) {
+    Model Dragon("../res/models/dragon/Dragon_Baked_Actions_fbx_7.4_binary.fbx");
+    if(!Dragon.Load()) {
         std::cerr << "[Err] Failed to load amongus.obj" << std::endl;
     }
-    Amongus.mPosition = glm::vec3(0.0f);
-    Amongus.mRotation = glm::vec3(0.0f);
-    Amongus.mScale    = glm::vec3(1e-3f);
+    Dragon.mPosition = glm::vec3(0.0f);
+    Dragon.mRotation = glm::vec3(-90.0f, 0.0f, 0.0f);
+    Dragon.mScale    = glm::vec3(1e-2f);
 
     // NOTE(Jovan): Camera init
     Camera OrbitalCamera(45.0f, 2.0f);
@@ -153,10 +190,8 @@ main() {
     View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
 
     // NOTE(Jovan): Set texture scale
-    glUseProgram(Shader.mId);
-    Shader.SetUniform1f("uTexScale", 1.0f);
-    Shader.SetUniform4m("uProjection", State.mProjection);
-    Shader.SetUniform4m("uView", View);
+    glUseProgram(Phong.mId);
+    Phong.SetUniform1f("uTexScale", 1.0f);
 
     Light PointLight;
     PointLight.Ambient = glm::vec3(0.3f);
@@ -166,18 +201,13 @@ main() {
     PointLight.Kl = 0.09f;
     PointLight.Kq = 0.032f;
     PointLight.Position = glm::vec3(0.0f, 1.0f, 2.0f);
-    Shader.SetUniform3f("uPointLights[0].Ambient", PointLight.Ambient);
-    Shader.SetUniform3f("uPointLights[0].Diffuse", PointLight.Diffuse);
-    Shader.SetUniform3f("uPointLights[0].Specular", PointLight.Specular);
-    Shader.SetUniform3f("uPointLights[0].Position", PointLight.Position);
-    Shader.SetUniform1f("uPointLights[0].Kc", PointLight.Kc);
-    Shader.SetUniform1f("uPointLights[0].Kl", PointLight.Kl);
-    Shader.SetUniform1f("uPointLights[0].Kq", PointLight.Kq);
-
-    //Shader.SetUniform3f("uMaterial.Ambient", glm::vec3(1.0f, 0.0f, 0.0f));
-    //Shader.SetUniform3f("uMaterial.Diffuse", glm::vec3(0.3f, 0.3f, 0.3f));
-    //Shader.SetUniform3f("uMaterial.Specular", glm::vec3(0.8f));
-    //Shader.SetUniform1f("uMaterial.Shininess", 128.0f);
+    Phong.SetUniform3f("uPointLights[0].Ambient", PointLight.Ambient);
+    Phong.SetUniform3f("uPointLights[0].Diffuse", PointLight.Diffuse);
+    Phong.SetUniform3f("uPointLights[0].Specular", PointLight.Specular);
+    Phong.SetUniform3f("uPointLights[0].Position", PointLight.Position);
+    Phong.SetUniform1f("uPointLights[0].Kc", PointLight.Kc);
+    Phong.SetUniform1f("uPointLights[0].Kl", PointLight.Kl);
+    Phong.SetUniform1f("uPointLights[0].Kq", PointLight.Kq);
 
     u32 FBO, RBO;
     _CreateFramebuffer(&FBO, &RBO, &State.mFBOTexture, State.mFramebufferSize.x, State.mFramebufferSize.y);
@@ -201,7 +231,7 @@ main() {
 
         StartTime = glfwGetTime();
         
-        glUseProgram(Shader.mId);
+        glUseProgram(Phong.mId);
         if(Scene.mHasResized) {
             std::cout << "Resizing" << std::endl;
             OldFBO = FBO;
@@ -218,14 +248,14 @@ main() {
             Scene.mHasResized = false;
         }
 
-        Shader.SetUniform4m("uProjection", State.mProjection);
-        Shader.SetUniform3f("uViewPos", State.mCamera->mPosition);
+        Phong.SetUniform4m("uProjection", State.mProjection);
+        Phong.SetUniform3f("uViewPos", State.mCamera->mPosition);
 
         View = glm::mat4(1.0f);
         View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
-        Shader.SetUniform4m("uView", View);
+        Phong.SetUniform4m("uView", View);
 
-        Shader.SetUniform4m("uModel", Amongus.mModel);
+        Phong.SetUniform4m("uModel", Dragon.mModel);
 
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
         glEnable(GL_DEPTH_TEST);
@@ -234,7 +264,7 @@ main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(0, 0, State.mFramebufferSize.x, State.mFramebufferSize.y);
         // NOTE(Jovan): Render model
-        Amongus.Render(Shader);
+        RenderModel(Dragon, Phong);
        
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glEnable(GL_DEPTH_TEST);
@@ -248,7 +278,7 @@ main() {
 
         Main.Render(&State, _WindowWidth, _WindowHeight);
         Scene.Render(&State);
-        ModelWindow.Render(Amongus.mFilename, &Amongus.mPosition[0], &Amongus.mRotation[0], &Amongus.mScale[0]);
+        ModelWindow.Render(Dragon.mFilename, &Dragon.mPosition[0], &Dragon.mRotation[0], &Dragon.mScale[0], Dragon.mNumVertices);
 
         ImGui::Begin("Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::Text("Position: %.2f, %.2f, %.2f", State.mCamera->mPosition.x, State.mCamera->mPosition.y, State.mCamera->mPosition.z);
