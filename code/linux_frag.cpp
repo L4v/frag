@@ -103,13 +103,19 @@ _ScrollCallback(GLFWwindow *window, r64 xoffset, r64 yoffset) {
 }
 
 void
-RenderModel(Model &model, ShaderProgram &program) {
+RenderModel(Model &model, ShaderProgram &program, r32 runningTime) {
     model.mModel = glm::mat4(1.0f);
     model.mModel = glm::translate(model.mModel, model.mPosition);
     model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
     model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
     model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
     model.mModel = glm::scale(model.mModel, model.mScale);
+
+    std::vector<glm::mat4> Transforms;
+    model.BoneTransform(runningTime, Transforms);
+    for(u32 TransformIdx = 0; TransformIdx < Transforms.size(); ++TransformIdx) {
+        program.SetUniform4m("uBones", Transforms[TransformIdx]);
+    }
 
     glBindVertexArray(model.mVAO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model.mBuffers[INDEX_BUFFER]);
@@ -170,11 +176,11 @@ main() {
     // NOTE(Jovan): Init imgui
     InitUI(Window);
 
-    ShaderProgram Phong("../shaders/basic.vert", "../shaders/basic.frag");
+    ShaderProgram Phong("../shaders/rigged.vert", "../shaders/rigged.frag");
 
     Model Dragon("../res/models/dragon/Dragon_Baked_Actions_fbx_7.4_binary.fbx");
     if(!Dragon.Load()) {
-        std::cerr << "[Err] Failed to load amongus.obj" << std::endl;
+        std::cerr << "[err] failed to load amongus.obj" << std::endl;
     }
     Dragon.mPosition = glm::vec3(0.0f);
     Dragon.mRotation = glm::vec3(-90.0f, 0.0f, 0.0f);
@@ -214,6 +220,8 @@ main() {
 
     r32 StartTime = glfwGetTime();
     r32 EndTime = glfwGetTime();
+    r32 BeginTime = glfwGetTime();
+    r32 RunningTime = glfwGetTime();
     State.mDT = EndTime - StartTime;
 
     u32 OldFBO;
@@ -230,10 +238,10 @@ main() {
     while(!glfwWindowShouldClose(Window)) {
 
         StartTime = glfwGetTime();
+        RunningTime = glfwGetTime() - BeginTime;
         
         glUseProgram(Phong.mId);
         if(Scene.mHasResized) {
-            std::cout << "Resizing" << std::endl;
             OldFBO = FBO;
             OldFBOTexture = State.mFBOTexture;
             OldRBO = RBO;
@@ -264,7 +272,7 @@ main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(0, 0, State.mFramebufferSize.x, State.mFramebufferSize.y);
         // NOTE(Jovan): Render model
-        RenderModel(Dragon, Phong);
+        RenderModel(Dragon, Phong, RunningTime);
        
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glEnable(GL_DEPTH_TEST);

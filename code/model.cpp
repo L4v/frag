@@ -1,4 +1,5 @@
 #include "model.hpp"
+#include <assimp/Importer.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "include/stb_image.h"
@@ -57,10 +58,12 @@ MeshInfo::LoadTextures(aiMaterial *material, Texture::ETextureType type, const s
 }
 
 Model::Model(std::string filename) {
+    mScene = 0;
     mFilename = filename;
     mDirectory = filename.substr(0, filename.find_last_of('/'));
     mNumVertices = 0;
     mNumIndices = 0;
+    mNumBones = 0;
     mBuffers.resize(BUFFER_COUNT);
 }
 
@@ -89,12 +92,11 @@ Model::Load() {
     glGenBuffers(BUFFER_COUNT, &mBuffers[0]);
 
     bool Result = false;
-    Assimp::Importer Importer;
 
-    mScene = Importer.ReadFile(mFilename, POSTPROCESS_FLAGS);
+    mScene = mImporter.ReadFile(mFilename, POSTPROCESS_FLAGS);
 
     if(!mScene || mScene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !mScene->mRootNode) {
-        std::cerr << "[Err] Failed to load model:" << std::endl << Importer.GetErrorString() << std::endl;
+        std::cerr << "[Err] Failed to load model:" << std::endl << mImporter.GetErrorString() << std::endl;
         Result = false;
     } else {
         aiMatrix4x4 Transform = mScene->mRootNode->mTransformation;
@@ -118,12 +120,14 @@ Model::Load() {
         mTexCoords.reserve(mNumVertices);
         mIndices.reserve(mNumIndices);
 
+#if 1
         // NOTE(Jovan): Should be zeroed
-        mBoneIds.resize(mNumVertices);
-        mBoneWeights.resize(mNumVertices);
+        mBoneIds.resize(mNumVertices * NUM_BONES_PER_VERTEX);
+        mBoneWeights.resize(mNumVertices * NUM_BONES_PER_VERTEX);
+#endif
 
         for(u32 MeshIdx = 0; MeshIdx < mMeshes.size(); ++MeshIdx) {
-            Model::ProcessMesh(MeshIdx);
+            Model::ProcessMesh(mScene, MeshIdx);
         }
         // NOTE(Jovan): Populate buffers
         glBindBuffer(GL_ARRAY_BUFFER, mBuffers[POS_VB]);
@@ -141,6 +145,7 @@ Model::Load() {
         glVertexAttribPointer(NORMAL_LOCATION, 3, GL_FLOAT, GL_FALSE, 0, 0);
         glEnableVertexAttribArray(NORMAL_LOCATION);
 
+#if 1
         glBindBuffer(GL_ARRAY_BUFFER, mBuffers[BONE_ID_VB]);
         glBufferData(GL_ARRAY_BUFFER, sizeof(mBoneIds[0]) * mBoneIds.size(), &mBoneIds[0], GL_STATIC_DRAW);
         glVertexAttribIPointer(BONE_ID_LOCATION, NUM_BONES_PER_VERTEX, GL_INT, 0, 0);
@@ -150,6 +155,7 @@ Model::Load() {
         glBufferData(GL_ARRAY_BUFFER, sizeof(mBoneWeights[0]) * mBoneWeights.size(), &mBoneWeights[0], GL_STATIC_DRAW);
         glVertexAttribPointer(BONE_WEIGHT_LOCATION, NUM_BONES_PER_VERTEX, GL_FLOAT, GL_FALSE, 0, 0);
         glEnableVertexAttribArray(BONE_WEIGHT_LOCATION);
+#endif 
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mBuffers[INDEX_BUFFER]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(mIndices[0]) * mIndices.size(), &mIndices[0], GL_STATIC_DRAW);
@@ -158,7 +164,6 @@ Model::Load() {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
         std::cout << "Loaded " << mMeshes.size() << " meshes" << std::endl;
-
         Result = true;
     }
     
@@ -167,7 +172,7 @@ Model::Load() {
 }
 
 void
-Model::ProcessMesh(u32 meshIdx) {
+Model::ProcessMesh(const aiScene *mScene, u32 meshIdx) {
     const aiMesh *Mesh = mScene->mMeshes[meshIdx];
     const aiVector3D Zero3D(0.0f, 0.0f, 0.0f);
 
@@ -196,6 +201,7 @@ Model::ProcessMesh(u32 meshIdx) {
         mMeshes[meshIdx].LoadTextures(MeshMaterial, Texture::SPECULAR, mDirectory);
     }
 
+#if 1
     //NOTE(Jovan): Load bones
     for(u32 BoneIdx = 0; BoneIdx < Mesh->mNumBones; ++BoneIdx) {
         u32 BoneIndex = 0;
@@ -211,7 +217,6 @@ Model::ProcessMesh(u32 meshIdx) {
         }
         mBoneMap[BoneName] = BoneIndex;
         mBoneInfos[BoneIndex].mOffset = aiMatrix4x4ToGLM(Mesh->mBones[BoneIdx]->mOffsetMatrix);
-
         for(u32 WeightIdx = 0; WeightIdx < Mesh->mBones[BoneIdx]->mNumWeights; ++WeightIdx) {
             u32 VertexId = mMeshes[meshIdx].mBaseVertex + Mesh->mBones[BoneIdx]->mWeights[WeightIdx].mVertexId;
             r32 Weight = Mesh->mBones[BoneIdx]->mWeights[WeightIdx].mWeight;
@@ -225,8 +230,10 @@ Model::ProcessMesh(u32 meshIdx) {
             }
         }
     }
+#endif
 }
 
+#if 1
 void
 Model::BoneTransform(r32 timeInSeconds, std::vector<glm::mat4> &transforms) {
     glm::mat4 Identity = glm::mat4(1.0f);
@@ -383,3 +390,4 @@ Model::FindNodeAnimation(const aiAnimation *animation, const std::string &nodeNa
     }
     return NULL;
 }
+#endif

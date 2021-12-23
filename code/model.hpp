@@ -63,8 +63,10 @@ private:
     std::vector<r32>             mBoneWeights;
     std::vector<BoneInfo>        mBoneInfos;
     std::map<std::string, u32>   mBoneMap;
-
+#if 1
+    Assimp::Importer             mImporter;
     const aiScene               *mScene;
+#endif
     u32                          mNumIndices;
     u32                          mNumBones;
 
@@ -78,6 +80,7 @@ private:
     void ReadNodeHierarchy(r32 animationTime, const aiNode *node, const glm::mat4 &parentTransform);
 public:
     u32                    mVAO;
+    u32                    mNumVertices;
     std::vector<MeshInfo>  mMeshes;
     std::vector<GLuint>    mBuffers;
     std::string            mFilename;
@@ -86,11 +89,10 @@ public:
     glm::vec3 mPosition;
     glm::vec3 mRotation;
     glm::vec3 mScale;
-    u32                    mNumVertices;
 
     Model(std::string filename);
     bool Load();
-    void ProcessMesh(u32 meshIdx);
+    void ProcessMesh(const aiScene *mScene, u32 meshIdx);
     void BoneTransform(r32 timeSeconds, std::vector<glm::mat4> &transforms);
 
 };
