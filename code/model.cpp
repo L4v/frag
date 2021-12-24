@@ -120,11 +120,8 @@ Model::Load() {
         mTexCoords.reserve(mNumVertices);
         mIndices.reserve(mNumIndices);
 
-#if 1
         // NOTE(Jovan): Should be zeroed
-        mBoneIds.resize(mNumVertices * NUM_BONES_PER_VERTEX);
-        mBoneWeights.resize(mNumVertices * NUM_BONES_PER_VERTEX);
-#endif
+        mBoneData.resize(mNumVertices);
 
         for(u32 MeshIdx = 0; MeshIdx < mMeshes.size(); ++MeshIdx) {
             Model::ProcessMesh(mScene, MeshIdx);
@@ -145,17 +142,13 @@ Model::Load() {
         glVertexAttribPointer(NORMAL_LOCATION, 3, GL_FLOAT, GL_FALSE, 0, 0);
         glEnableVertexAttribArray(NORMAL_LOCATION);
 
-#if 1
-        glBindBuffer(GL_ARRAY_BUFFER, mBuffers[BONE_ID_VB]);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(mBoneIds[0]) * mBoneIds.size(), &mBoneIds[0], GL_STATIC_DRAW);
-        glVertexAttribIPointer(BONE_ID_LOCATION, NUM_BONES_PER_VERTEX, GL_INT, 0, 0);
+        glBindBuffer(GL_ARRAY_BUFFER, mBuffers[BONE_VB]);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(mBoneData[0]) * mBoneData.size(), &mBoneData[0], GL_STATIC_DRAW);
+        glVertexAttribIPointer(BONE_ID_LOCATION, NUM_BONES_PER_VERTEX, GL_INT, sizeof(VertexBoneData), (const GLvoid*)0);
         glEnableVertexAttribArray(BONE_ID_LOCATION);
 
-        glBindBuffer(GL_ARRAY_BUFFER, mBuffers[BONE_WEIGHT_VB]);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(mBoneWeights[0]) * mBoneWeights.size(), &mBoneWeights[0], GL_STATIC_DRAW);
-        glVertexAttribPointer(BONE_WEIGHT_LOCATION, NUM_BONES_PER_VERTEX, GL_FLOAT, GL_FALSE, 0, 0);
+        glVertexAttribPointer(BONE_WEIGHT_LOCATION, NUM_BONES_PER_VERTEX, GL_FLOAT, GL_FALSE, sizeof(VertexBoneData), (const GLvoid*)(NUM_BONES_PER_VERTEX * sizeof(u32)));
         glEnableVertexAttribArray(BONE_WEIGHT_LOCATION);
-#endif 
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mBuffers[INDEX_BUFFER]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(mIndices[0]) * mIndices.size(), &mIndices[0], GL_STATIC_DRAW);
@@ -201,39 +194,33 @@ Model::ProcessMesh(const aiScene *mScene, u32 meshIdx) {
         mMeshes[meshIdx].LoadTextures(MeshMaterial, Texture::SPECULAR, mDirectory);
     }
 
-#if 1
     //NOTE(Jovan): Load bones
     for(u32 BoneIdx = 0; BoneIdx < Mesh->mNumBones; ++BoneIdx) {
         u32 BoneIndex = 0;
         std::string BoneName(Mesh->mBones[BoneIdx]->mName.data);
 
         if(mBoneMap.find(BoneName) == mBoneMap.end()) {
-            BoneIndex = mNumBones++;
+            BoneIndex = mNumBones;
+            ++mNumBones;
             BoneInfo Info;
             mBoneInfos.push_back(Info);
+            mBoneInfos[BoneIndex].mOffset = aiMatrix4x4ToGLM(Mesh->mBones[BoneIdx]->mOffsetMatrix);
+            mBoneMap[BoneName] = BoneIndex;
         } else {
-            // TODO(Jovan): ???
             BoneIndex = mBoneMap[BoneName];
         }
-        mBoneMap[BoneName] = BoneIndex;
-        mBoneInfos[BoneIndex].mOffset = aiMatrix4x4ToGLM(Mesh->mBones[BoneIdx]->mOffsetMatrix);
+
         for(u32 WeightIdx = 0; WeightIdx < Mesh->mBones[BoneIdx]->mNumWeights; ++WeightIdx) {
             u32 VertexId = mMeshes[meshIdx].mBaseVertex + Mesh->mBones[BoneIdx]->mWeights[WeightIdx].mVertexId;
             r32 Weight = Mesh->mBones[BoneIdx]->mWeights[WeightIdx].mWeight;
             // NOTE(Jovan): Inserting in parallel for SIMD
             for(u32 i = 0; i < NUM_BONES_PER_VERTEX; ++i) {
-                if(mBoneWeights[VertexId + i] == 0.0f) {
-                    mBoneIds[VertexId + i] = BoneIndex;
-                    mBoneWeights[VertexId + i] = Weight;
-                    break;
-                }
+                mBoneData[VertexId].AddBoneData(BoneIndex, Weight);
             }
         }
     }
-#endif
 }
 
-#if 1
 void
 Model::BoneTransform(r32 timeInSeconds, std::vector<glm::mat4> &transforms) {
     glm::mat4 Identity = glm::mat4(1.0f);
@@ -263,10 +250,8 @@ Model::ReadNodeHierarchy(r32 animationTime, const aiNode *node, const glm::mat4 
 
         aiQuaternion Rotation;
         InterpolateRotation(Rotation, animationTime, nodeAnimation);
-        glm::mat4 RotationM = glm::mat4(1.0f);
-        RotationM = glm::rotate(RotationM, glm::radians(Rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-        RotationM = glm::rotate(RotationM, glm::radians(Rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-        RotationM = glm::rotate(RotationM, glm::radians(Rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+        glm::quat RotationQ = glm::quat(Rotation.w, Rotation.x, Rotation.y, Rotation.z);
+        glm::mat4 RotationM = glm::toMat4(RotationQ);
 
         aiVector3D Translation;
         InterpolateTranslation(Translation, animationTime, nodeAnimation);
@@ -333,8 +318,8 @@ Model::InterpolateRotation(aiQuaternion &out, r32 animationTime, const aiNodeAni
 
     u32 RotationIndex = FindRotation(animationTime, nodeAnimation);
     u32 NextRotationIndex = RotationIndex + 1;
-    r32 T1 = (r32)nodeAnimation->mRotationKeys[RotationIndex].mTime - (r32)nodeAnimation->mScalingKeys[0].mTime;
-    r32 T2 = (r32)nodeAnimation->mRotationKeys[NextRotationIndex].mTime - (r32)nodeAnimation->mScalingKeys[0].mTime;
+    r32 T1 = (r32)nodeAnimation->mRotationKeys[RotationIndex].mTime - (r32)nodeAnimation->mRotationKeys[0].mTime;
+    r32 T2 = (r32)nodeAnimation->mRotationKeys[NextRotationIndex].mTime - (r32)nodeAnimation->mRotationKeys[0].mTime;
     r32 DT = T2 - T1;
     r32 Factor = (animationTime - T1) / DT;
     const aiQuaternion &Start = nodeAnimation->mRotationKeys[RotationIndex].mValue;
@@ -390,4 +375,3 @@ Model::FindNodeAnimation(const aiAnimation *animation, const std::string &nodeNa
     }
     return NULL;
 }
-#endif

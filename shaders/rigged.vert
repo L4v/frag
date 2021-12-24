@@ -21,9 +21,9 @@ out vec4 vertexColor;
 
 void main() {
     mat4 BoneTransform = uBones[aBoneIds[0]] * aWeights[0];
-    BoneTransform += uBones[aBoneIds[1]] * aWeights[1];
-    BoneTransform += uBones[aBoneIds[2]] * aWeights[2];
-    BoneTransform += uBones[aBoneIds[3]] * aWeights[3];
+    BoneTransform     += uBones[aBoneIds[1]] * aWeights[1];
+    BoneTransform     += uBones[aBoneIds[2]] * aWeights[2];
+    BoneTransform     += uBones[aBoneIds[3]] * aWeights[3];
 
     vec4 LocalPos = BoneTransform * vec4(aPos, 1.0f);
     FragPos = vec3(uModel * LocalPos);

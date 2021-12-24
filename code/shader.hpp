@@ -22,8 +22,7 @@ enum EBufferType {
     POS_VB,
     TEXCOORD_VB,
     NORM_VB,
-    BONE_ID_VB,
-    BONE_WEIGHT_VB,
+    BONE_VB,
 
     BUFFER_COUNT,
 };

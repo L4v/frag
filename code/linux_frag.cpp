@@ -110,6 +110,7 @@ RenderModel(Model &model, ShaderProgram &program, r32 runningTime) {
     model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
     model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
     model.mModel = glm::scale(model.mModel, model.mScale);
+    program.SetUniform4m("uModel", model.mModel);
 
     std::vector<glm::mat4> Transforms;
     model.BoneTransform(runningTime, Transforms);
@@ -177,6 +178,7 @@ main() {
     InitUI(Window);
 
     ShaderProgram Phong("../shaders/rigged.vert", "../shaders/rigged.frag");
+    ShaderProgram RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
 
     Model Dragon("../res/models/dragon/Dragon_Baked_Actions_fbx_7.4_binary.fbx");
     if(!Dragon.Load()) {
@@ -262,8 +264,6 @@ main() {
         View = glm::mat4(1.0f);
         View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
         Phong.SetUniform4m("uView", View);
-
-        Phong.SetUniform4m("uModel", Dragon.mModel);
 
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
         glEnable(GL_DEPTH_TEST);

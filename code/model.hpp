@@ -10,6 +10,8 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include "include/glad/glad.h"
 
@@ -53,15 +55,29 @@ struct BoneInfo {
 
 class Model {
 private:
+    struct VertexBoneData {
+        u32 mIds[NUM_BONES_PER_VERTEX];
+        r32 mWeights[NUM_BONES_PER_VERTEX];
+
+        void AddBoneData(u32 id, r32 weight) {
+            for(u32 i = 0; i < NUM_BONES_PER_VERTEX; ++i) {
+                if(mWeights[i] == 0.0f) {
+                    mIds[i] = id;
+                    mWeights[i] = weight;
+                    break;
+                }
+            }
+        };
+    };
+
     glm::mat4                    mGlobalInverseTransform;
     std::vector<glm::vec3>       mPositions;
     std::vector<glm::vec2>       mTexCoords;
     std::vector<glm::vec3>       mNormals;
     std::vector<u32>             mIndices;
     std::vector<Texture*>        mTextures;
-    std::vector<u32>             mBoneIds;
-    std::vector<r32>             mBoneWeights;
     std::vector<BoneInfo>        mBoneInfos;
+    std::vector<VertexBoneData>  mBoneData;
     std::map<std::string, u32>   mBoneMap;
 #if 1
     Assimp::Importer             mImporter;
