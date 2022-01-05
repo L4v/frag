@@ -5,6 +5,8 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <fstream>
+#include <vector>
+#include <algorithm>
 
 #include "include/glad/glad.h"
 #include "types.hpp"
@@ -27,6 +29,20 @@ enum EBufferType {
     BUFFER_COUNT,
 };
 
+struct Texture {
+    enum ETextureType {
+        DIFFUSE = 0,
+        SPECULAR,
+
+        TYPECOUNT
+    };
+
+    u32          mId;
+    ETextureType mType;
+    std::string  mPath;
+    Texture(const std::string &path, ETextureType type);
+};
+
 class ShaderProgram {
 public:
     u32 mId;
@@ -36,6 +52,7 @@ public:
     void SetUniform1f(const std::string &uniform, r32 f) const;
     void SetUniform3f(const std::string &uniform, const glm::vec3 &v) const;
     void SetUniform4m(const std::string &uniform, const glm::mat4 &m, GLboolean transpose = GL_FALSE) const;
+    void SetUniform4m(const std::string &uniform, const std::vector<glm::mat4> &m, GLboolean transpose = GL_FALSE) const;
 private:
     u32 loadAndCompileShader(std::string filename, GLuint shaderType);
     u32 createBasicProgram(u32 vShader, u32 fShader);

@@ -1,11 +1,8 @@
 #ifndef FRAG_HPP
 #define FRAG_HPP
-#include <glm/glm.hpp>
-#include "types.hpp"
+#include "math3d.hpp"
 
 #define ArrayCount(array) (sizeof(array) / sizeof(array[0]))
-#define PI 3.14159265358979f
-#define PI_HALF PI / 2.0f
 
 // TODO(Jovan): In separate file?
 // TODO(Jovan): Panning?
@@ -26,7 +23,7 @@ public:
     glm::vec3 mTarget;
 
     // NOTE(Jovan): Orbital camera constructor
-    Camera(r32 fov, r32 distance, r32 rotateSpeed = 1.0f, r32 zoomSpeed = 2.0f, glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3 target = glm::vec3(0.0f)) {
+    Camera(r32 fov, r32 distance, r32 rotateSpeed = 1.0f, r32 zoomSpeed = 20.0f, glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3 target = glm::vec3(0.0f)) {
         mFOV = fov;
         mDistance = distance;
         mRotateSpeed = rotateSpeed;
@@ -112,5 +109,4 @@ struct EngineState {
         mFramebufferSize = glm::vec2(1920, 1080);
     }
 };
-
 #endif

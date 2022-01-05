@@ -1,5 +1,42 @@
 #include "shader.hpp"
 
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "include/stb_image.h"
+
+Texture::Texture(const std::string &path, ETextureType type) {
+    mPath = path;
+    mType = type;
+    std::replace(mPath.begin(), mPath.end(), '\\', '/');
+    glGenTextures(1, &mId);
+    i32 Width, Height, Channels;
+    unsigned char *Data = stbi_load(mPath.c_str(), &Width, &Height, &Channels, 0);
+    std::cout << "Loading " << mPath << " image" << std::endl;
+    if(Data) {
+        GLenum Format;
+        if(Channels == 1) {
+            Format = GL_RED;
+        } else if (Channels == 3) {
+            Format = GL_RGB;
+        } else if (Channels == 4) {
+            Format = GL_RGBA;
+        }
+
+        glBindTexture(GL_TEXTURE_2D, mId);
+        glTexImage2D(GL_TEXTURE_2D, 0, Format, Width, Height, 0, Format, GL_UNSIGNED_BYTE, Data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+        stbi_image_free(Data);
+    } else {
+        std::cerr << "[Err] Texture failed to load" << std::endl;
+    }
+}
+
 ShaderProgram::ShaderProgram(const std::string &vShaderPath, const std::string &fShaderPath) {
     u32 vs = loadAndCompileShader(vShaderPath, GL_VERTEX_SHADER);
     u32 fs = loadAndCompileShader(fShaderPath, GL_FRAGMENT_SHADER);
@@ -80,4 +117,9 @@ ShaderProgram::SetUniform3f(const std::string &uniform, const glm::vec3 &v) cons
 void
 ShaderProgram::SetUniform4m(const std::string &uniform, const glm::mat4 &m, GLboolean transpose) const {
     glUniformMatrix4fv(glGetUniformLocation(mId, uniform.c_str()), 1, transpose, &m[0][0]);
+}
+
+void
+ShaderProgram::SetUniform4m(const std::string &uniform, const std::vector<glm::mat4> &m, GLboolean transpose) const {
+    glUniformMatrix4fv(glGetUniformLocation(mId, uniform.c_str()), m.size(), transpose, (GLfloat*)&m[0]);
 }

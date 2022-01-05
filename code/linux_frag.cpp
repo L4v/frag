@@ -3,11 +3,6 @@
 #include <GLFW/glfw3.h>
 #include <string>
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/ext/matrix_clip_space.hpp>
-#include <glm/ext/matrix_transform.hpp>
-
 #include "frag.hpp"
 #include "ui.hpp"
 #include "types.hpp"
@@ -103,6 +98,115 @@ _ScrollCallback(GLFWwindow *window, r64 xoffset, r64 yoffset) {
 }
 
 void
+RenderCube() {
+    static bool IsLoaded = false;
+    static u32 VAO;
+    static u32 Buffers[BUFFER_COUNT] = { 0 };
+    static u32 IndexCount = 0;
+    if (!IsLoaded) {
+        std::cout << "Loading cube" << std::endl;
+        r32 Vertices[] = {
+            //      pos        |       norm       |    tex
+            // NEAR
+            -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, // Bottom left  0
+             0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, // Bottom right 1
+            -0.5f,  0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, // Top left     2
+             0.5f,  0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, // Top right    3
+
+             // FAR
+            -0.5f, -0.5f,  0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,  // Bottom left  4
+             0.5f, -0.5f,  0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f,  // Bottom right 5
+            -0.5f,  0.5f,  0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f,  // Top left     6
+             0.5f,  0.5f,  0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,  // Top right    7
+
+             // LEFT
+            -0.5f,  0.5f,  0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f,  // Top near     8
+            -0.5f,  0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,  // Top far      9
+            -0.5f, -0.5f,  0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f,  // Bottom near  10
+            -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f,  // Bottom far   11
+
+            // RIGHT
+            0.5f,  0.5f,  0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,  // Top near     12
+            0.5f,  0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,  // Top far      13
+            0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,  // Bottom near  14
+            0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,  // Bottom far   15
+
+             // BOTTOM
+            -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f,  // Near left    16
+             0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,  // Near right   17
+            -0.5f, -0.5f,  0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,  // Far left     18
+             0.5f, -0.5f,  0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f,  // Far right    19
+
+             // TOP
+            -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,  // Near left    20
+             0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // Near right   21
+            -0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,  // Far left     22
+             0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f  // Far right    23
+        };
+
+        i32 Indices[] = {
+            // NEAR
+            0, 1, 2,
+            2, 1, 3,
+
+            // FAR
+            4, 5, 6,
+            6, 5, 7,
+
+            // LEFT
+            8, 9, 10,
+            10, 9, 11,
+
+            // RIGHT
+            12, 13, 14,
+            14, 13, 15,
+
+            // BOTTOM
+            16, 17, 18,
+            18, 17, 19,
+
+            // TOP
+            20, 21, 22,
+            22, 21, 23
+        };
+
+        GLsizei Stride = 8 * sizeof(r32);
+
+
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(BUFFER_COUNT, Buffers);
+
+        glBindVertexArray(VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, Buffers[POS_VB]);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertices), Vertices, GL_STATIC_DRAW);
+
+        glVertexAttribPointer(POSITION_LOCATION, 3, GL_FLOAT, GL_FALSE, Stride, (void*)0);
+        glEnableVertexAttribArray(POSITION_LOCATION);
+
+        glVertexAttribPointer(NORMAL_LOCATION, 3, GL_FLOAT, GL_FALSE, Stride, (void*)(3 * sizeof(r32)));
+        glEnableVertexAttribArray(NORMAL_LOCATION);
+
+        glVertexAttribPointer(TEX_COORD_LOCATION, 2, GL_FLOAT, GL_FALSE, Stride, (void*)(6 * sizeof(r32)));
+        glEnableVertexAttribArray(TEX_COORD_LOCATION);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[INDEX_BUFFER]);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+        IndexCount = ArrayCount(Indices);
+        IsLoaded = true;
+    }
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[INDEX_BUFFER]);
+    glDrawElements(GL_TRIANGLES, IndexCount, GL_UNSIGNED_INT, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+void
 RenderModel(Model &model, ShaderProgram &program, r32 runningTime) {
     model.mModel = glm::mat4(1.0f);
     model.mModel = glm::translate(model.mModel, model.mPosition);
@@ -112,11 +216,9 @@ RenderModel(Model &model, ShaderProgram &program, r32 runningTime) {
     model.mModel = glm::scale(model.mModel, model.mScale);
     program.SetUniform4m("uModel", model.mModel);
 
-    std::vector<glm::mat4> Transforms;
-    model.BoneTransform(runningTime, Transforms);
-    for(u32 TransformIdx = 0; TransformIdx < Transforms.size(); ++TransformIdx) {
-        program.SetUniform4m("uBones", Transforms[TransformIdx]);
-    }
+    //std::vector<glm::mat4> Transforms;
+    //model.BoneTransform(runningTime, Transforms);
+    //program.SetUniform4m("uBones", Transforms, Transforms.size());
 
     glBindVertexArray(model.mVAO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model.mBuffers[INDEX_BUFFER]);
@@ -177,16 +279,17 @@ main() {
     // NOTE(Jovan): Init imgui
     InitUI(Window);
 
-    ShaderProgram Phong("../shaders/rigged.vert", "../shaders/rigged.frag");
+    ShaderProgram Phong("../shaders/basic.vert", "../shaders/basic.frag");
     ShaderProgram RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
+    ShaderProgram Debug("../shaders/debug.vert", "../shaders/debug.frag");
 
-    Model Dragon("../res/models/dragon/Dragon_Baked_Actions_fbx_7.4_binary.fbx");
+    Model Dragon("../res/models/backpack.obj");
     if(!Dragon.Load()) {
         std::cerr << "[err] failed to load amongus.obj" << std::endl;
     }
     Dragon.mPosition = glm::vec3(0.0f);
-    Dragon.mRotation = glm::vec3(-90.0f, 0.0f, 0.0f);
-    Dragon.mScale    = glm::vec3(1e-2f);
+    Dragon.mRotation = glm::vec3(0.0f, 0.0f, 0.0f);
+    Dragon.mScale    = glm::vec3(1e-1f);
 
     // NOTE(Jovan): Camera init
     Camera OrbitalCamera(45.0f, 2.0f);
@@ -267,16 +370,17 @@ main() {
 
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
         glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
         glClearColor(0x34 / (r32) 255, 0x49 / (r32) 255, 0x5e / (r32) 255, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(0, 0, State.mFramebufferSize.x, State.mFramebufferSize.y);
         // NOTE(Jovan): Render model
+        glUseProgram(RiggedPhong.mId);
+        RiggedPhong.SetUniform4m("uProjection", State.mProjection);
+        RiggedPhong.SetUniform4m("uView", View);
         RenderModel(Dragon, Phong, RunningTime);
-       
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(0, 0, _WindowWidth, _WindowHeight);
