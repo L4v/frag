@@ -6,15 +6,11 @@
 #include <vector>
 #include <map>
 #include <iostream>
-#include <glm/glm.hpp>
-#include <glm/ext.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/quaternion.hpp>
-#include <glm/gtc/quaternion.hpp>
 
 #include "include/glad/glad.h"
 
 #include "shader.hpp"
+#include "math3d.hpp"
 
 #define POSTPROCESS_FLAGS (aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals)
 #define INVALID_MATERIAL 0xFFFFFFFF

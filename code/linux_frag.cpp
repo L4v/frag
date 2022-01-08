@@ -13,16 +13,16 @@ internal i32 _WindowWidth = 800;
 internal i32 _WindowHeight = 600;
 
 struct Light {
-    glm::vec3 Position;
+    v3 Position;
     r32       Size;
 
     r32       Kc;
     r32       Kl;
     r32       Kq;
 
-    glm::vec3 Ambient;
-    glm::vec3 Diffuse;
-    glm::vec3 Specular;
+    v3 Ambient;
+    v3 Diffuse;
+    v3 Specular;
 };
 
 void
@@ -296,9 +296,9 @@ main() {
     EngineState State(&OrbitalCamera);
     glfwSetWindowUserPointer(Window, &State);
 
-    State.mProjection = glm::perspective(glm::radians(State.mCamera->mFOV), State.mFramebufferSize.x / (r32) State.mFramebufferSize.y, 0.1f, 100.0f);
-    glm::mat4 View = glm::mat4(1.0f);
-    View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
+    State.mProjection = perspective(State.mCamera->mFOV, State.mFramebufferSize.X / (r32) State.mFramebufferSize.Y, 0.1f, 100.0f);
+    m44 View(1.0f);
+    View = lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
 
     // NOTE(Jovan): Set texture scale
     glUseProgram(Phong.mId);
@@ -351,9 +351,9 @@ main() {
             OldFBOTexture = State.mFBOTexture;
             OldRBO = RBO;
 
-            _CreateFramebuffer(&FBO, &RBO, &State.mFBOTexture, State.mFramebufferSize.x, State.mFramebufferSize.y);
+            _CreateFramebuffer(&FBO, &RBO, &State.mFBOTexture, State.mFramebufferSize.X, State.mFramebufferSize.Y);
             glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-            State.mProjection = glm::perspective(glm::radians(State.mCamera->mFOV), State.mFramebufferSize.x / (r32) State.mFramebufferSize.y, 0.1f, 100.0f);
+            State.mProjection = perspective(State.mCamera->mFOV, State.mFramebufferSize.X / (r32) State.mFramebufferSize.Y, 0.1f, 100.0f);
 
             glDeleteFramebuffers(1, &OldFBO);
             glDeleteRenderbuffers(1, &OldRBO);
@@ -364,8 +364,8 @@ main() {
         Phong.SetUniform4m("uProjection", State.mProjection);
         Phong.SetUniform3f("uViewPos", State.mCamera->mPosition);
 
-        View = glm::mat4(1.0f);
-        View = glm::lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
+        View.LoadIdentity();
+        View = lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
         Phong.SetUniform4m("uView", View);
 
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
@@ -393,7 +393,7 @@ main() {
         ModelWindow.Render(Dragon.mFilename, &Dragon.mPosition[0], &Dragon.mRotation[0], &Dragon.mScale[0], Dragon.mNumVertices);
 
         ImGui::Begin("Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::Text("Position: %.2f, %.2f, %.2f", State.mCamera->mPosition.x, State.mCamera->mPosition.y, State.mCamera->mPosition.z);
+        ImGui::Text("Position: %.2f, %.2f, %.2f", State.mCamera->mPosition.X, State.mCamera->mPosition.Y, State.mCamera->mPosition.Z);
         ImGui::Text("Pitch: %.2f", State.mCamera->mPitch * 180.0f / PI);
         ImGui::Text("Yaw: %.2f", State.mCamera->mYaw * 180.0f / PI);
         ImGui::End();

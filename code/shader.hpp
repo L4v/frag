@@ -2,14 +2,13 @@
 #define SHADER_HPP
 
 #include <iostream>
-#include <glm/glm.hpp>
 #include <string>
 #include <fstream>
 #include <vector>
 #include <algorithm>
 
 #include "include/glad/glad.h"
-#include "types.hpp"
+#include "math3d.hpp"
 
 #define POSITION_LOCATION    0
 #define TEX_COORD_LOCATION   1
@@ -50,9 +49,9 @@ public:
     ShaderProgram(const std::string &vShaderPath, const std::string &fShaderPath);
     void SetUniform1i(const std::string &uniform, i32 i) const;
     void SetUniform1f(const std::string &uniform, r32 f) const;
-    void SetUniform3f(const std::string &uniform, const glm::vec3 &v) const;
-    void SetUniform4m(const std::string &uniform, const glm::mat4 &m, GLboolean transpose = GL_FALSE) const;
-    void SetUniform4m(const std::string &uniform, const std::vector<glm::mat4> &m, GLboolean transpose = GL_FALSE) const;
+    void SetUniform3f(const std::string &uniform, const v3 &v) const;
+    void SetUniform4m(const std::string &uniform, const m44 &m, GLboolean transpose = GL_FALSE) const;
+    void SetUniform4m(const std::string &uniform, const std::vector<m44> &m, GLboolean transpose = GL_FALSE) const;
 private:
     u32 loadAndCompileShader(std::string filename, GLuint shaderType);
     u32 createBasicProgram(u32 vShader, u32 fShader);

@@ -15,15 +15,15 @@ public:
     r32         mDistance;
     r32         mZoomSpeed;
 
-    glm::vec3 mWorldUp;
-    glm::vec3 mPosition;
-    glm::vec3 mFront;
-    glm::vec3 mUp;
-    glm::vec3 mRight;
-    glm::vec3 mTarget;
+    v3 mWorldUp;
+    v3 mPosition;
+    v3 mFront;
+    v3 mUp;
+    v3 mRight;
+    v3 mTarget;
 
     // NOTE(Jovan): Orbital camera constructor
-    Camera(r32 fov, r32 distance, r32 rotateSpeed = 1.0f, r32 zoomSpeed = 20.0f, glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3 target = glm::vec3(0.0f)) {
+    Camera(r32 fov, r32 distance, r32 rotateSpeed = 1.0f, r32 zoomSpeed = 20.0f, const v3 &worldUp = v3(0.0f, 1.0f, 0.0f), const v3 &target = v3(0.0f)) {
         mFOV = fov;
         mDistance = distance;
         mRotateSpeed = rotateSpeed;
@@ -74,21 +74,21 @@ public:
 private:
     void
     _UpdateVectors() {
-        mPosition.x = mDistance * cos(mYaw) * cos(mPitch);
-        mPosition.y = -mDistance * sin(mPitch);
-        mPosition.z = mDistance * sin(mYaw) * cos(mPitch);
-        mFront = glm::normalize(mTarget - mPosition);
-        mRight = glm::normalize(glm::cross(mFront, mWorldUp));
-        mUp = glm::normalize(glm::cross(mRight, mFront));
+        mPosition.X = mDistance * cos(mYaw) * cos(mPitch);
+        mPosition.Y = -mDistance * sin(mPitch);
+        mPosition.Z = mDistance * sin(mYaw) * cos(mPitch);
+        mFront = (mTarget - mPosition).GetNormalized();
+        mRight = (mFront ^ mWorldUp).GetNormalized();
+        mUp = (mRight ^ mFront).GetNormalized();
     }
 };
 
 
 struct EngineState {
     Camera    *mCamera;
-    glm::mat4 mProjection;
-    glm::vec2 mCursorPos;
-    glm::vec2 mFramebufferSize;
+    m44 mProjection;
+    v2 mCursorPos;
+    v2 mFramebufferSize;
     r32       mDT;
     u32       mFBOTexture;
 
@@ -99,14 +99,14 @@ struct EngineState {
 
     EngineState(Camera *camera) {
         mCamera = camera;
-        mProjection = glm::mat4(1.0f);
-        mCursorPos = glm::vec2(0.0f, 0.0f);
+        mProjection = m44(1.0f);
+        mCursorPos = v2(0.0f, 0.0f);
         mDT = 0.0f;
         mLeftMouse = false;
         mImGUIInitialized = false;
         mSceneWindowFocused = false;
         mFirstMouse = true;
-        mFramebufferSize = glm::vec2(1920, 1080);
+        mFramebufferSize = v2(1920, 1080);
     }
 };
 #endif

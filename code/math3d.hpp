@@ -3,10 +3,14 @@
 
 #ifdef __cplusplus
 #include <cmath>
+#define SIN(x) std::sin(x)
+#define COS(x) std::cos(x)
 #define SQRT(x) std::sqrt(x)
 #define TAN(x) tanf(x)
 #else
 #include <math.h>
+#define SIN(x) sin(x)
+#define COS(x) cos(x)
 #define SQRT(x) sqrt(x)
 #define TAN(x) tanf(x)
 #endif
@@ -18,6 +22,110 @@ const r32 PI_HALF = PI / 2.0f;
 const r32 RAD = PI / 180.0f;
 const r32 DEG = 180.0f / PI;
 
+struct v2 {
+    union {
+        r32 Values[2] = {0};
+        struct {
+            r32 X; r32 Y;
+        };
+    };
+    v2() {
+      X = 0.0f; Y = 0.0f;
+    }
+
+    v2(const v2 &v) {
+        X = v.X; Y = v.Y;
+    }
+
+    v2(r32 x) {
+        X = x; Y = x;
+    }
+
+    v2(const r32 *x) {
+        X = x[0]; Y = x[1];
+    }
+
+    v2(r32 *x) {
+        X = x[0]; Y = x[1];
+    }
+
+    v2(r32 x, r32 y) {
+        X = x; Y = y;
+    }
+
+    inline r32 Magnitude() const {
+        return SQRT(X*X + Y*Y);
+    }
+    
+    inline v2& Normalize() {
+        r32 L = this->Magnitude();
+        X /= L; Y /= L;
+        return *this;
+    }
+
+    inline v2 GetNormalized() const {
+        r32 L = Magnitude();
+        return v2(X / L, Y / L);
+    }
+
+    inline r32& operator[] (i32 i) {
+        return Values[i];
+    }
+
+    inline const r32& operator[] (i32 i) const {
+        return Values[i];
+    }
+
+    inline v2& operator= (const v2 &a) {
+        X = a.X; Y = a.Y;
+        return *this;
+    }
+
+    inline v2& operator+= (const v2 &a) {
+        X += a.X; Y += a.Y;
+        return *this;
+    }
+
+    inline v2& operator-= (const v2 &a) {
+        X -= a.X; Y -= a.Y;
+        return *this;
+    }
+
+    inline v2& operator/= (r32 s) {
+        X /= s; Y /= s;
+        return *this;
+    }
+
+    inline v2& operator*= (r32 s) {
+        X *= s; Y *= s;
+        return *this;
+    }
+
+    inline v2 operator+ (const v2 &a) const {
+        return v2(X + a.X, Y + a.Y);
+    }
+
+    inline v2 operator- () const {
+        return v2(-X, -Y);
+    }
+
+    inline v2 operator- (const v2 &a) const {
+        return *this + (-a);
+    }
+
+    inline v2 operator/ (r32 s) const {
+        return v2(X / s, Y / s);
+    }
+
+    inline v2 operator* (r32 s) const {
+        return v2(s * X, s * Y);
+    }
+
+    // NOTE(Jovan): Dot product
+    inline r32 operator* (const v2 &a) const {
+        return X * a.X + Y * a.Y;
+    }
+};
 
 struct v3 {
     union {
@@ -53,22 +161,18 @@ struct v3 {
         X = x; Y = y; Z = z;
     }
 
-    inline r32 Length() const {
+    inline r32 Magnitude() const {
         return SQRT(X*X + Y*Y + Z*Z);
-    }
-
-    inline r32 SquaredLength() {
-        return X * X + Y * Y + Z * Z;
     }
     
     inline v3& Normalize() {
-        r32 L = this->Length();
+        r32 L = this->Magnitude();
         X /= L; Y /= L; Z /= L;
         return *this;
     }
 
     inline v3 GetNormalized() const {
-        r32 L = Length();
+        r32 L = Magnitude();
         return v3(X / L, Y / L, Z / L);
     }
 
@@ -171,22 +275,18 @@ struct v4 {
         X = x; Y = y; Z = z; W = w;
     }
 
-    inline r32 Length() {
+    inline r32 Magnitude() {
         return SQRT(X*X + Y*Y + Z*Z + W*W);
-    }
-
-    inline r32 SquaredLength() {
-        return X * X + Y * Y + Z * Z + W * W;
     }
     
     inline v4& Normalize() {
-        r32 L = this->Length();
+        r32 L = this->Magnitude();
         X /= L; Y /= L; Z /= L; W /= L;
         return *this;
     }
 
     inline v4 GetNormalized() {
-        r32 L = this->Length();
+        r32 L = this->Magnitude();
         return v4(X / L, Y / L, Z / L, W / L);
     }
 
@@ -272,27 +372,35 @@ struct quat {
         R = x[0]; V = v3(&x[1]);
     }
 
+    // NOTE(Jovan): Angle gets halved
+    quat(const v3 &axis, r32 angle) {
+        r32 Rad = (angle / 2.0f) * RAD;
+        r32 Sin = SIN(Rad);
+        r32 Cos = COS(Rad);
+        R = Cos; V = Sin * (axis.GetNormalized());
+    }
+
     inline quat& Normalize() {
-        r32 L = Length();
+        r32 L = Magnitude();
         
         return *this;
     }
 
     inline quat GetNormalized() {
-        r32 L = Length();
+        r32 L = Magnitude();
         return quat(R / L, V / L);
     }
 
-    inline r32 Length() const {
+    inline r32 Magnitude() const {
         return SQRT(R * R + V * V);
     }
     
     inline r32& operator[] (i32 i) {
-        return i == 0 ? R : V[i];
+        return i == 0 ? R : V[i - 1];
     }
 
     inline const r32& operator[] (i32 i) const {
-        return i == 0 ? R : V[i];
+        return i == 0 ? R : V[i - 1];
     }
 
     inline quat& operator= (const quat &q) {
@@ -331,18 +439,31 @@ struct quat {
         return quat(s * R, s * V);
     }
 
+    inline quat operator/ (r32 s) const {
+        return quat(R / s, V / s);
+    }
+
+    // NOTE(Jovan): Dot product
+    inline r32 operator* (const quat &q) const {
+        return R * q.R + V * q.V;
+    }
+
     // NOTE(Jovan): Hamilton product
-    inline quat operator* (const quat &q) {
+    inline quat operator^ (const quat &q) const {
         return quat(R * q.R    - V[0] * q.V[0] - V[1] * q.V[1] - V[2] * q.V[2],
                     R * q.V[0] + V[0] * q.R    + V[1] * q.V[2] - V[2] * q.V[1],
                     R * q.V[1] - V[0] * q.V[2] + V[1] * q.R    + V[2] * q.V[0],
                     R * q.V[2] + V[0] * q.V[1] - V[1] * q.V[0] + V[2] * q.R);
     }
 
+    // NOTE(Jovan): Conjugate
+    inline quat operator!() {
+        return quat(R, -V);
+    }
+
     // NOTE(Jovan): Inverse
     inline quat operator~() {
-        r32 SL = R * R + V.SquaredLength();
-        return quat(R / SL, V / SL);
+        return (!(*this)) / ((*this) * (*this));
     }
 
 };
@@ -460,6 +581,12 @@ struct m44 {
         return *this;
     }
 
+    // TODO(Jovan): Optimize && check why reverse mul is required
+    inline m44& Rotate(const quat &q) {
+        *this = m44(q) * (*this);
+        return *this;
+    }
+
     inline v4& operator[] (i32 i) {
         return Values[i];
     }
@@ -476,7 +603,7 @@ struct m44 {
         return *this;
     }
 
-    inline m44 operator*= (const m44 &a) {
+    inline m44& operator*= (const m44 &a) {
         *this = m44(a.X0 * X0 + a.X1 * Y0 + a.X2 * Z0 + a.X3 * W0,
             a.Y0 * X0 + a.Y1 * Y0 + a.Y2 * Z0 + a.Y3 * W0,
             a.Z0 * X0 + a.Z1 * Y0 + a.Z2 * Z0 + a.Z3 * W0,
