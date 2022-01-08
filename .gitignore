@@ -2,3 +2,4 @@ build
 spec.txt
 res/models/
 test_math3d.cpp
+.vscode
