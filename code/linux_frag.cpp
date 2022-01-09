@@ -217,36 +217,21 @@ RenderCube() {
 }
 
 void
-RenderModel(Model &model, ShaderProgram &program, r32 runningTime) {
+RenderModel(Model &model, ShaderProgram &program, r32 runningTime, u32 vao, u32 indexBuffer) {
     model.mModel.LoadIdentity();
     model.mModel
         .Translate(model.mPosition)
+        // TODO(Jovan): Tidy it up with quaternions?
+        .Rotate(quat(v3(1.0f, 0.0f, 0.0f), model.mRotation.X))
+        .Rotate(quat(v3(0.0f, 1.0f, 0.0f), model.mRotation.Y))
+        .Rotate(quat(v3(0.0f, 0.0f, 1.0f), model.mRotation.Z))
         .Scale(model.mScale);
-    // model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-    // model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-    // model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
     program.SetUniform4m("uModel", model.mModel);
 
-    //std::vector<glm::mat4> Transforms;
-    //model.BoneTransform(runningTime, Transforms);
-    //program.SetUniform4m("uBones", Transforms, Transforms.size());
-
-    glBindVertexArray(model.mVAO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model.mBuffers[INDEX_BUFFER]);
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     for(u32 MeshIdx = 0; MeshIdx < model.mMeshes.size(); ++MeshIdx) {
         Mesh &Mesh = model.mMeshes[MeshIdx];
-
-        // for(u32 TexIdx = 0; TexIdx < Mesh.mTextures.size(); ++TexIdx) {
-        //     Texture &Tex = Mesh.mTextures[TexIdx];
-        //     glActiveTexture(GL_TEXTURE0 + TexIdx);
-        //     // TODO(Jovan): Multiple same-type texture support
-        //     if(Tex.mType == Texture::DIFFUSE) {
-        //         program.SetUniform1i("uDiffuse", TexIdx);
-        //     } else if (Tex.mType == Texture::SPECULAR) {
-        //         program.SetUniform1i("uSpecular", TexIdx);
-        //     }
-        //     glBindTexture(GL_TEXTURE_2D, Tex.mId);
-        // }
 
         glDrawElementsBaseVertex(GL_TRIANGLES,
                 model.mMeshes[MeshIdx].mNumIndices,
@@ -294,12 +279,41 @@ main() {
     ShaderProgram RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
     ShaderProgram Debug("../shaders/debug.vert", "../shaders/debug.frag");
 
-    Model Dragon("../res/models/amongus.obj");
-    if(!Dragon.Load()) {
+    Model Dragon("../res/models/backpack.obj");
+
+    u32 ModelVAO;
+    u32 ModelBuffers[BUFFER_COUNT];
+    std::vector<v3> Vertices;
+    std::vector<v3> Normals;
+    std::vector<u32> Indices;
+
+    if(!Dragon.Load(Vertices, Normals, Indices)) {
         std::cerr << "[err] failed to load amongus.obj" << std::endl;
     }
+
+    glGenVertexArrays(1, &ModelVAO);
+    glBindVertexArray(ModelVAO);
+    glGenBuffers(BUFFER_COUNT, ModelBuffers);
+
+    glBindBuffer(GL_ARRAY_BUFFER, ModelBuffers[POS_VB]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertices[0]) * Vertices.size(), &Vertices[0], GL_STATIC_DRAW);
+    glVertexAttribPointer(POSITION_LOCATION, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(POSITION_LOCATION);
+
+    glBindBuffer(GL_ARRAY_BUFFER, ModelBuffers[NORM_VB]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Normals[0]) * Normals.size(), &Normals[0], GL_STATIC_DRAW);
+    glVertexAttribPointer(NORMAL_LOCATION, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(NORMAL_LOCATION);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ModelBuffers[INDEX_BUFFER]);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices[0]) * Indices.size(), &Indices[0], GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
     Dragon.mPosition = v3(0.0f);
-    // Dragon.mRotation = v3(0.0f, 0.0f, 0.0f);
+    Dragon.mRotation = v3(0.0f, 0.0f, 0.0f);
     Dragon.mScale    = v3(0.008f);
 
     // NOTE(Jovan): Camera init
@@ -384,13 +398,9 @@ main() {
         glClearColor(0x34 / (r32) 255, 0x49 / (r32) 255, 0x5e / (r32) 255, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(0, 0, State.mFramebufferSize.X, State.mFramebufferSize.Y);
+
         // NOTE(Jovan): Render model
-        // glUseProgram(RiggedPhong.mId);
-        // RiggedPhong.SetUniform4m("uProjection", State.mProjection);
-        // RiggedPhong.SetUniform4m("uView", View);
-        // Phong.SetUniform4m("uModel", m44(1.0f));
-        // RenderCube();
-        RenderModel(Dragon, Phong, RunningTime);
+        RenderModel(Dragon, Phong, RunningTime, ModelVAO, ModelBuffers[INDEX_BUFFER]);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glEnable(GL_DEPTH_TEST);
@@ -403,7 +413,7 @@ main() {
 
         Main.Render(&State, _WindowWidth, _WindowHeight);
         Scene.Render(&State);
-        ModelWindow.Render(Dragon.mFilepath, &Dragon.mPosition[0], &Dragon.mScale[0], Dragon.mNumVertices);
+        ModelWindow.Render(Dragon.mFilepath, &Dragon.mPosition[0], &Dragon.mRotation[0] ,&Dragon.mScale[0], Dragon.mNumVertices);
 
         ImGui::Begin("Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::Text("Position: %.2f, %.2f, %.2f", State.mCamera->mPosition.X, State.mCamera->mPosition.Y, State.mCamera->mPosition.Z);

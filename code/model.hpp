@@ -30,15 +30,15 @@ private:
     u32 mNumIndices;
 public:
     u32 mNumVertices;
-    u32 mVAO;
-    u32 mBuffers[BUFFER_COUNT];
     m44 mModel;
     v3 mPosition;
+    // TODO(Jovan): Quaternion representation?
+    v3 mRotation;
     v3 mScale;
     std::string mFilepath;
     std::vector<Mesh> mMeshes;
     Model(const std::string &filePath);
-    bool Load();
+    bool Load(std::vector<v3> &vertices, std::vector<v3> &normals, std::vector<u32> &indices);
 };
 
 #define MESH_HP

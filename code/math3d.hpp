@@ -349,7 +349,7 @@ struct quat {
     v3 V;
 
     quat() {
-       R = 0.0f; V = v3(0.0f);
+       R = 1.0f; V = v3(0.0f);
     }
 
     quat(const quat &q) {

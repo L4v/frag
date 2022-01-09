@@ -34,12 +34,12 @@ ModelWindow::ModelWindow(const std::string &name, ImGuiWindowFlags flags) {
 }
 
 void
-ModelWindow::Render(const std::string &filename, r32 *position, r32 *scale, i32 vertexCount) {
+ModelWindow::Render(const std::string &filename, r32 *position, r32 *rotation, r32 *scale, i32 vertexCount) {
     ImGui::Begin(mName.c_str(), NULL, mFlags);
     ImGui::Text("Loaded model: %s", filename.c_str());
     ImGui::Spacing();
     ImGui::DragFloat3("Position", position, 1e-3f);
-    // ImGui::DragFloat3("Rotation", rotation, 1e-1f);
+    ImGui::DragFloat3("Rotation", rotation, 1e-1f);
     ImGui::DragFloat3("Scale", scale, 1e-3f);
     ImGui::Spacing();
     ImGui::Text("Vertices: %d", vertexCount);
