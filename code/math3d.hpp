@@ -723,7 +723,7 @@ inline m44 perspective(r32 angleFOVY, r32 aspectRatio, r32 near, r32 far) {
               0.0f,             0.0f, 2.0f * far * near / (near - far),  0.0f);
 }
 
-m44 lookAt(const v3 &eye, const v3 &center, const v3 &up) {
+static m44 lookAt(const v3 &eye, const v3 &center, const v3 &up) {
     v3 F = (center - eye).GetNormalized();
     v3 S = (F ^ up).GetNormalized();
     v3 U = S ^ F;

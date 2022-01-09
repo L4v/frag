@@ -27,15 +27,16 @@ private:
     Assimp::Importer mImporter;
     const aiScene *mScene;
 
-    std::vector<Mesh> mMeshes;
-    std::vector<r32> mVertices;
-    std::vector<u32> mIndices;
-
-    u32 mNumVertices;
     u32 mNumIndices;
 public:
-
+    u32 mNumVertices;
+    u32 mVAO;
+    u32 mBuffers[BUFFER_COUNT];
+    m44 mModel;
+    v3 mPosition;
+    v3 mScale;
     std::string mFilepath;
+    std::vector<Mesh> mMeshes;
     Model(const std::string &filePath);
     bool Load();
 };

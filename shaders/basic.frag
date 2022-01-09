@@ -57,7 +57,8 @@ void main() {
         Result += CalculatePointLight(uPointLights[PtLightIdx], NormalizedNormal, FragPos, ViewDir);
     }
 
-    FragColor = vec4(Result, 1.0);
+    //FragColor = vec4(Result, 1.0);
+    FragColor = vec4(1.0);
 }
 
 vec3

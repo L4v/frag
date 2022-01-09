@@ -3,7 +3,6 @@
 #include <GLFW/glfw3.h>
 #include <string>
 
-#include "frag.hpp"
 #include "ui.hpp"
 #include "types.hpp"
 #include "shader.hpp"
@@ -105,46 +104,62 @@ RenderCube() {
     static u32 IndexCount = 0;
     if (!IsLoaded) {
         std::cout << "Loading cube" << std::endl;
-        r32 Vertices[] = {
-            //      pos        |       norm       |    tex
-            // NEAR
-            -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, // Bottom left  0
-             0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, // Bottom right 1
-            -0.5f,  0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, // Top left     2
-             0.5f,  0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, // Top right    3
 
-             // FAR
-            -0.5f, -0.5f,  0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,  // Bottom left  4
-             0.5f, -0.5f,  0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f,  // Bottom right 5
-            -0.5f,  0.5f,  0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f,  // Top left     6
-             0.5f,  0.5f,  0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,  // Top right    7
-
-             // LEFT
-            -0.5f,  0.5f,  0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f,  // Top near     8
-            -0.5f,  0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,  // Top far      9
-            -0.5f, -0.5f,  0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f,  // Bottom near  10
-            -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f,  // Bottom far   11
-
-            // RIGHT
-            0.5f,  0.5f,  0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,  // Top near     12
-            0.5f,  0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,  // Top far      13
-            0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,  // Bottom near  14
-            0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,  // Bottom far   15
-
-             // BOTTOM
-            -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f,  // Near left    16
-             0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,  // Near right   17
-            -0.5f, -0.5f,  0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,  // Far left     18
-             0.5f, -0.5f,  0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f,  // Far right    19
-
-             // TOP
-            -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,  // Near left    20
-             0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // Near right   21
-            -0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,  // Far left     22
-             0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f  // Far right    23
+        std::vector<v3> Vertices = {
+            v3(-0.5f, -0.5f, -0.5f), 
+            v3( 0.5f, -0.5f, -0.5f), 
+            v3(-0.5f,  0.5f, -0.5f), 
+            v3( 0.5f,  0.5f, -0.5f), 
+            v3(-0.5f, -0.5f,  0.5f), 
+            v3( 0.5f, -0.5f,  0.5f), 
+            v3(-0.5f,  0.5f,  0.5f), 
+            v3( 0.5f,  0.5f,  0.5f), 
+            v3(-0.5f,  0.5f,  0.5f), 
+            v3(-0.5f,  0.5f, -0.5f), 
+            v3(-0.5f, -0.5f,  0.5f), 
+            v3(-0.5f, -0.5f, -0.5f), 
+            v3(0.5f,  0.5f,  0.5f),  
+            v3(0.5f,  0.5f, -0.5f),  
+            v3(0.5f, -0.5f,  0.5f),  
+            v3(0.5f, -0.5f, -0.5f),  
+            v3(-0.5f, -0.5f, -0.5f), 
+            v3( 0.5f, -0.5f, -0.5f), 
+            v3(-0.5f, -0.5f,  0.5f), 
+            v3( 0.5f, -0.5f,  0.5f), 
+            v3(-0.5f,  0.5f, -0.5f), 
+            v3( 0.5f,  0.5f, -0.5f), 
+            v3(-0.5f,  0.5f,  0.5f), 
+            v3( 0.5f,  0.5f,  0.5f)
         };
 
-        i32 Indices[] = {
+        std::vector<v3> Normals = {
+            v3(0.0f, 0.0f, 1.0f),  
+            v3(0.0f, 0.0f, 1.0f),  
+            v3(0.0f, 0.0f, 1.0f),  
+            v3(0.0f, 0.0f, 1.0f),  
+            v3(0.0f, 0.0f, -1.0f), 
+            v3(0.0f, 0.0f, -1.0f), 
+            v3(0.0f, 0.0f, -1.0f), 
+            v3(0.0f, 0.0f, -1.0f), 
+            v3(-1.0f, 0.0f, 0.0f), 
+            v3(-1.0f, 0.0f, 0.0f), 
+            v3(-1.0f, 0.0f, 0.0f), 
+            v3(-1.0f, 0.0f, 0.0f), 
+            v3(1.0f, 0.0f, 0.0f),  
+            v3(1.0f, 0.0f, 0.0f),  
+            v3(1.0f, 0.0f, 0.0f),  
+            v3(1.0f, 0.0f, 0.0f),  
+            v3(0.0f, -1.0f, 0.0f), 
+            v3(0.0f, -1.0f, 0.0f), 
+            v3(0.0f, -1.0f, 0.0f), 
+            v3(0.0f, -1.0f, 0.0f), 
+            v3(0.0f, 1.0f, 0.0f),  
+            v3(0.0f, 1.0f, 0.0f),  
+            v3(0.0f, 1.0f, 0.0f),  
+            v3(0.0f, 1.0f, 0.0f)   
+        };
+
+        u32 Indices[] = {
             // NEAR
             0, 1, 2,
             2, 1, 3,
@@ -170,24 +185,19 @@ RenderCube() {
             22, 21, 23
         };
 
-        GLsizei Stride = 8 * sizeof(r32);
-
-
         glGenVertexArrays(1, &VAO);
         glGenBuffers(BUFFER_COUNT, Buffers);
 
         glBindVertexArray(VAO);
         glBindBuffer(GL_ARRAY_BUFFER, Buffers[POS_VB]);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertices), Vertices, GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertices[0]) * Vertices.size() , &Vertices[0], GL_STATIC_DRAW);
 
-        glVertexAttribPointer(POSITION_LOCATION, 3, GL_FLOAT, GL_FALSE, Stride, (void*)0);
+        glVertexAttribPointer(POSITION_LOCATION, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(r32), (void*)(0));
         glEnableVertexAttribArray(POSITION_LOCATION);
 
-        glVertexAttribPointer(NORMAL_LOCATION, 3, GL_FLOAT, GL_FALSE, Stride, (void*)(3 * sizeof(r32)));
+        glBindBuffer(GL_ARRAY_BUFFER, Buffers[NORM_VB]);
+        glVertexAttribPointer(NORMAL_LOCATION, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(r32), (void*)(0));
         glEnableVertexAttribArray(NORMAL_LOCATION);
-
-        glVertexAttribPointer(TEX_COORD_LOCATION, 2, GL_FLOAT, GL_FALSE, Stride, (void*)(6 * sizeof(r32)));
-        glEnableVertexAttribArray(TEX_COORD_LOCATION);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[INDEX_BUFFER]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
@@ -201,19 +211,20 @@ RenderCube() {
 
     glBindVertexArray(VAO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[INDEX_BUFFER]);
-    glDrawElements(GL_TRIANGLES, IndexCount, GL_UNSIGNED_INT, 0);
+    glDrawElementsBaseVertex(GL_TRIANGLES, IndexCount, GL_UNSIGNED_INT, (void*)0, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 }
 
 void
 RenderModel(Model &model, ShaderProgram &program, r32 runningTime) {
-    model.mModel = glm::mat4(1.0f);
-    model.mModel = glm::translate(model.mModel, model.mPosition);
-    model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-    model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-    model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-    model.mModel = glm::scale(model.mModel, model.mScale);
+    model.mModel.LoadIdentity();
+    model.mModel
+        .Translate(model.mPosition)
+        .Scale(model.mScale);
+    // model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+    // model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+    // model.mModel = glm::rotate(model.mModel, glm::radians(model.mRotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
     program.SetUniform4m("uModel", model.mModel);
 
     //std::vector<glm::mat4> Transforms;
@@ -223,19 +234,19 @@ RenderModel(Model &model, ShaderProgram &program, r32 runningTime) {
     glBindVertexArray(model.mVAO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model.mBuffers[INDEX_BUFFER]);
     for(u32 MeshIdx = 0; MeshIdx < model.mMeshes.size(); ++MeshIdx) {
-        MeshInfo &Mesh = model.mMeshes[MeshIdx];
+        Mesh &Mesh = model.mMeshes[MeshIdx];
 
-        for(u32 TexIdx = 0; TexIdx < Mesh.mTextures.size(); ++TexIdx) {
-            Texture &Tex = Mesh.mTextures[TexIdx];
-            glActiveTexture(GL_TEXTURE0 + TexIdx);
-            // TODO(Jovan): Multiple same-type texture support
-            if(Tex.mType == Texture::DIFFUSE) {
-                program.SetUniform1i("uDiffuse", TexIdx);
-            } else if (Tex.mType == Texture::SPECULAR) {
-                program.SetUniform1i("uSpecular", TexIdx);
-            }
-            glBindTexture(GL_TEXTURE_2D, Tex.mId);
-        }
+        // for(u32 TexIdx = 0; TexIdx < Mesh.mTextures.size(); ++TexIdx) {
+        //     Texture &Tex = Mesh.mTextures[TexIdx];
+        //     glActiveTexture(GL_TEXTURE0 + TexIdx);
+        //     // TODO(Jovan): Multiple same-type texture support
+        //     if(Tex.mType == Texture::DIFFUSE) {
+        //         program.SetUniform1i("uDiffuse", TexIdx);
+        //     } else if (Tex.mType == Texture::SPECULAR) {
+        //         program.SetUniform1i("uSpecular", TexIdx);
+        //     }
+        //     glBindTexture(GL_TEXTURE_2D, Tex.mId);
+        // }
 
         glDrawElementsBaseVertex(GL_TRIANGLES,
                 model.mMeshes[MeshIdx].mNumIndices,
@@ -283,13 +294,13 @@ main() {
     ShaderProgram RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
     ShaderProgram Debug("../shaders/debug.vert", "../shaders/debug.frag");
 
-    Model Dragon("../res/models/backpack.obj");
+    Model Dragon("../res/models/amongus.obj");
     if(!Dragon.Load()) {
         std::cerr << "[err] failed to load amongus.obj" << std::endl;
     }
-    Dragon.mPosition = glm::vec3(0.0f);
-    Dragon.mRotation = glm::vec3(0.0f, 0.0f, 0.0f);
-    Dragon.mScale    = glm::vec3(1e-1f);
+    Dragon.mPosition = v3(0.0f);
+    // Dragon.mRotation = v3(0.0f, 0.0f, 0.0f);
+    Dragon.mScale    = v3(0.008f);
 
     // NOTE(Jovan): Camera init
     Camera OrbitalCamera(45.0f, 2.0f);
@@ -305,13 +316,13 @@ main() {
     Phong.SetUniform1f("uTexScale", 1.0f);
 
     Light PointLight;
-    PointLight.Ambient = glm::vec3(0.3f);
-    PointLight.Diffuse = glm::vec3(0.5f);
-    PointLight.Specular = glm::vec3(1.0f);
+    PointLight.Ambient = v3(0.3f);
+    PointLight.Diffuse = v3(0.5f);
+    PointLight.Specular = v3(1.0f);
     PointLight.Kc = 1.0f;
     PointLight.Kl = 0.09f;
     PointLight.Kq = 0.032f;
-    PointLight.Position = glm::vec3(0.0f, 1.0f, 2.0f);
+    PointLight.Position = v3(0.0f, 1.0f, 2.0f);
     Phong.SetUniform3f("uPointLights[0].Ambient", PointLight.Ambient);
     Phong.SetUniform3f("uPointLights[0].Diffuse", PointLight.Diffuse);
     Phong.SetUniform3f("uPointLights[0].Specular", PointLight.Specular);
@@ -321,7 +332,7 @@ main() {
     Phong.SetUniform1f("uPointLights[0].Kq", PointLight.Kq);
 
     u32 FBO, RBO;
-    _CreateFramebuffer(&FBO, &RBO, &State.mFBOTexture, State.mFramebufferSize.x, State.mFramebufferSize.y);
+    _CreateFramebuffer(&FBO, &RBO, &State.mFBOTexture, State.mFramebufferSize.X, State.mFramebufferSize.Y);
 
     r32 StartTime = glfwGetTime();
     r32 EndTime = glfwGetTime();
@@ -372,11 +383,13 @@ main() {
         glEnable(GL_DEPTH_TEST);
         glClearColor(0x34 / (r32) 255, 0x49 / (r32) 255, 0x5e / (r32) 255, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glViewport(0, 0, State.mFramebufferSize.x, State.mFramebufferSize.y);
+        glViewport(0, 0, State.mFramebufferSize.X, State.mFramebufferSize.Y);
         // NOTE(Jovan): Render model
-        glUseProgram(RiggedPhong.mId);
-        RiggedPhong.SetUniform4m("uProjection", State.mProjection);
-        RiggedPhong.SetUniform4m("uView", View);
+        // glUseProgram(RiggedPhong.mId);
+        // RiggedPhong.SetUniform4m("uProjection", State.mProjection);
+        // RiggedPhong.SetUniform4m("uView", View);
+        // Phong.SetUniform4m("uModel", m44(1.0f));
+        // RenderCube();
         RenderModel(Dragon, Phong, RunningTime);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -390,7 +403,7 @@ main() {
 
         Main.Render(&State, _WindowWidth, _WindowHeight);
         Scene.Render(&State);
-        ModelWindow.Render(Dragon.mFilename, &Dragon.mPosition[0], &Dragon.mRotation[0], &Dragon.mScale[0], Dragon.mNumVertices);
+        ModelWindow.Render(Dragon.mFilepath, &Dragon.mPosition[0], &Dragon.mScale[0], Dragon.mNumVertices);
 
         ImGui::Begin("Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::Text("Position: %.2f, %.2f, %.2f", State.mCamera->mPosition.X, State.mCamera->mPosition.Y, State.mCamera->mPosition.Z);

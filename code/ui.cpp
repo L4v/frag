@@ -34,12 +34,12 @@ ModelWindow::ModelWindow(const std::string &name, ImGuiWindowFlags flags) {
 }
 
 void
-ModelWindow::Render(const std::string &filename, r32 *position, r32 *rotation, r32 *scale, i32 vertexCount) {
+ModelWindow::Render(const std::string &filename, r32 *position, r32 *scale, i32 vertexCount) {
     ImGui::Begin(mName.c_str(), NULL, mFlags);
     ImGui::Text("Loaded model: %s", filename.c_str());
     ImGui::Spacing();
     ImGui::DragFloat3("Position", position, 1e-3f);
-    ImGui::DragFloat3("Rotation", rotation, 1e-1f);
+    // ImGui::DragFloat3("Rotation", rotation, 1e-1f);
     ImGui::DragFloat3("Scale", scale, 1e-3f);
     ImGui::Spacing();
     ImGui::Text("Vertices: %d", vertexCount);
@@ -91,25 +91,25 @@ SceneWindow::Render(EngineState *state) {
         state->mSceneWindowFocused = ImGui::IsWindowFocused();
         ImVec2 CursorPos = ImGui::GetIO().MousePos;
         if(state->mFirstMouse) {
-            state->mCursorPos.x = CursorPos.x;
-            state->mCursorPos.y = CursorPos.y;
+            state->mCursorPos.X = CursorPos.x;
+            state->mCursorPos.Y = CursorPos.y;
             state->mFirstMouse = false;
         }
-        r32 DX = state->mCursorPos.x - CursorPos.x;
-        r32 DY = CursorPos.y - state->mCursorPos.y;
-        state->mCursorPos.x = CursorPos.x;
-        state->mCursorPos.y = CursorPos.y;
+        r32 DX = state->mCursorPos.X - CursorPos.x;
+        r32 DY = CursorPos.y - state->mCursorPos.Y;
+        state->mCursorPos.X = CursorPos.x;
+        state->mCursorPos.Y = CursorPos.y;
 
         if(state->mLeftMouse && state->mSceneWindowFocused) {
             state->mCamera->Rotate(DX, DY, state->mDT);
         }
 
         ImVec2 WindowSize = ImGui::GetWindowSize();
-        if (state->mFramebufferSize.x != WindowSize.x || state->mFramebufferSize.y != WindowSize.y) {
+        if (state->mFramebufferSize.X != WindowSize.x || state->mFramebufferSize.Y != WindowSize.y) {
             mHasResized = true;
         }
-        state->mFramebufferSize.x = WindowSize.x;
-        state->mFramebufferSize.y = WindowSize.y;
+        state->mFramebufferSize.X = WindowSize.x;
+        state->mFramebufferSize.Y = WindowSize.y;
 
         ImGui::Image((ImTextureID)state->mFBOTexture, WindowSize, ImVec2(0, 1), ImVec2(1, 0));
         ImGui::EndChild();

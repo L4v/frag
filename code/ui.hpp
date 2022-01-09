@@ -19,7 +19,7 @@ public:
     std::string      mName;
 
     ModelWindow(const std::string &name, ImGuiWindowFlags flags);
-    void Render(const std::string &filename, r32 *position, r32 *rotation, r32 *scale, i32 vertexCount);
+    void Render(const std::string &filename, r32 *position, r32 *scale, i32 vertexCount);
 
 };
 
