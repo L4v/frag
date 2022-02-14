@@ -4,6 +4,30 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "include/stb_image.h"
 
+GLBuffers::GLBuffers() {
+    glGenBuffers(BUFFER_COUNT, mIds);
+}
+
+void
+GLBuffers::Destroy() {
+    glDeleteBuffers(BUFFER_COUNT, mIds);
+}
+
+void
+GLBuffers::SetPointer(EBufferType bufferType, GLuint index, GLint size, GLenum type, GLsizei stride, const void *pointer, GLboolean normalized, GLenum target){
+    glBindBuffer(target, mIds[bufferType]);
+    glVertexAttribPointer(index, size, type, normalized, stride, pointer);
+    glEnableVertexAttribArray(index);
+    glBindBuffer(target, 0);
+}
+
+void
+GLBuffers::BufferData(EBufferType type, GLsizeiptr size, const void *data, GLenum target, GLenum usage) {
+    glBindBuffer(target, mIds[type]);
+    glBufferData(target, size, data, usage);
+    glBindBuffer(target, 0);
+}
+
 Texture::Texture(const std::string &path, ETextureType type) {
     mPath = path;
     mType = type;
@@ -35,6 +59,10 @@ Texture::Texture(const std::string &path, ETextureType type) {
     } else {
         std::cerr << "[Err] Texture failed to load" << std::endl;
     }
+}
+
+Texture::~Texture() {
+    // glDeleteTextures(1, &mId);
 }
 
 ShaderProgram::ShaderProgram(const std::string &vShaderPath, const std::string &fShaderPath) {

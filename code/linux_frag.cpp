@@ -2,6 +2,7 @@
 #include "include/glad/glad.h"
 #include <GLFW/glfw3.h>
 #include <string>
+#include <algorithm>
 
 #include "ui.hpp"
 #include "types.hpp"
@@ -12,13 +13,12 @@ internal i32 _WindowWidth = 800;
 internal i32 _WindowHeight = 600;
 
 struct Light {
+    r32 Size;
+    r32 Kc;
+    r32 Kl;
+    r32 Kq;
+
     v3 Position;
-    r32       Size;
-
-    r32       Kc;
-    r32       Kl;
-    r32       Kq;
-
     v3 Ambient;
     v3 Diffuse;
     v3 Specular;
@@ -100,7 +100,8 @@ void
 RenderCube() {
     static bool IsLoaded = false;
     static u32 VAO;
-    static u32 Buffers[BUFFER_COUNT] = { 0 };
+    GLBuffers CubeBuffers;
+    u32 Buffers[GLBuffers::BUFFER_COUNT] = {0};
     static u32 IndexCount = 0;
     if (!IsLoaded) {
         std::cout << "Loading cube" << std::endl;
@@ -186,31 +187,33 @@ RenderCube() {
         };
 
         glGenVertexArrays(1, &VAO);
-        glGenBuffers(BUFFER_COUNT, Buffers);
-
+        glGenBuffers(GLBuffers::BUFFER_COUNT, Buffers);
         glBindVertexArray(VAO);
-        glBindBuffer(GL_ARRAY_BUFFER, Buffers[POS_VB]);
+
+
+        glBindBuffer(GL_ARRAY_BUFFER, Buffers[GLBuffers::POS_VB]);
         glBufferData(GL_ARRAY_BUFFER, sizeof(Vertices[0]) * Vertices.size() , &Vertices[0], GL_STATIC_DRAW);
 
-        glVertexAttribPointer(POSITION_LOCATION, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(r32), (void*)(0));
-        glEnableVertexAttribArray(POSITION_LOCATION);
+        glVertexAttribPointer(GLBuffers::POSITION_LOCATION, 3, GL_FLOAT, GL_FALSE, 0, (void*)(0));
+        glEnableVertexAttribArray(GLBuffers::POSITION_LOCATION);
 
-        glBindBuffer(GL_ARRAY_BUFFER, Buffers[NORM_VB]);
-        glVertexAttribPointer(NORMAL_LOCATION, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(r32), (void*)(0));
-        glEnableVertexAttribArray(NORMAL_LOCATION);
+        glBindBuffer(GL_ARRAY_BUFFER, Buffers[GLBuffers::NORM_VB]);
+        glVertexAttribPointer(GLBuffers::NORMAL_LOCATION, 3, GL_FLOAT, GL_FALSE, 0, (void*)(0));
+        glEnableVertexAttribArray(GLBuffers::NORMAL_LOCATION);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[INDEX_BUFFER]);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[GLBuffers::INDEX_BUFFER]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
         glBindVertexArray(0);
         IndexCount = ArrayCount(Indices);
         IsLoaded = true;
     }
 
     glBindVertexArray(VAO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[INDEX_BUFFER]);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[GLBuffers::INDEX_BUFFER]);
     glDrawElementsBaseVertex(GL_TRIANGLES, IndexCount, GL_UNSIGNED_INT, (void*)0, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -231,7 +234,20 @@ RenderModel(Model &model, ShaderProgram &program, r32 runningTime, u32 vao, u32 
     glBindVertexArray(vao);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     for(u32 MeshIdx = 0; MeshIdx < model.mMeshes.size(); ++MeshIdx) {
-        Mesh &Mesh = model.mMeshes[MeshIdx];
+        const Mesh &Mesh = model.mMeshes[MeshIdx];
+        const Material &Material = Mesh.mMaterial;
+
+        if(Material.mDiffuseTextureId) {
+            glActiveTexture(GL_TEXTURE0);
+            program.SetUniform1i("uDiffuse", 0);
+            glBindTexture(GL_TEXTURE_2D, Material.mDiffuseTextureId);
+        }
+
+        if(Material.mSpecularTextureId) {
+            glActiveTexture(GL_TEXTURE1);
+            program.SetUniform1i("uSpecular", 1);
+            glBindTexture(GL_TEXTURE_2D, Material.mSpecularTextureId);
+        }
 
         glDrawElementsBaseVertex(GL_TRIANGLES,
                 model.mMeshes[MeshIdx].mNumIndices,
@@ -280,41 +296,53 @@ main() {
     ShaderProgram Debug("../shaders/debug.vert", "../shaders/debug.frag");
 
     Model Dragon("../res/models/backpack.obj");
+    
+    Dragon.mPosition = v3(0.0f);
+    Dragon.mRotation = v3(0.0f, 0.0f, 0.0f);
+    Dragon.mScale    = v3(0.8f);
 
     u32 ModelVAO;
-    u32 ModelBuffers[BUFFER_COUNT];
+    std::vector<v2> TexCoords;
     std::vector<v3> Vertices;
     std::vector<v3> Normals;
     std::vector<u32> Indices;
+    std::vector<Texture> ModelTextures;
 
-    if(!Dragon.Load(Vertices, Normals, Indices)) {
+    if(!Dragon.Load(Vertices, Normals, TexCoords, Indices)) {
         std::cerr << "[err] failed to load amongus.obj" << std::endl;
     }
 
     glGenVertexArrays(1, &ModelVAO);
     glBindVertexArray(ModelVAO);
-    glGenBuffers(BUFFER_COUNT, ModelBuffers);
+    GLBuffers ModelBuffers;
+    ModelBuffers.BufferData(GLBuffers::POS_VB, sizeof(Vertices[0]) * Vertices.size(), &Vertices[0]);
+    ModelBuffers.SetPointer(GLBuffers::POS_VB, GLBuffers::POSITION_LOCATION, 3, GL_FLOAT, 0, 0);
 
-    glBindBuffer(GL_ARRAY_BUFFER, ModelBuffers[POS_VB]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertices[0]) * Vertices.size(), &Vertices[0], GL_STATIC_DRAW);
-    glVertexAttribPointer(POSITION_LOCATION, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(POSITION_LOCATION);
+    ModelBuffers.BufferData(GLBuffers::NORM_VB, sizeof(Normals[0]) * Normals.size(), &Normals[0]);
+    ModelBuffers.SetPointer(GLBuffers::NORM_VB, GLBuffers::NORMAL_LOCATION, 3, GL_FLOAT, 0, 0);
 
-    glBindBuffer(GL_ARRAY_BUFFER, ModelBuffers[NORM_VB]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Normals[0]) * Normals.size(), &Normals[0], GL_STATIC_DRAW);
-    glVertexAttribPointer(NORMAL_LOCATION, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(NORMAL_LOCATION);
+    ModelBuffers.BufferData(GLBuffers::TEXCOORD_VB, sizeof(TexCoords[0]) * TexCoords.size(), &TexCoords[0]);
+    ModelBuffers.SetPointer(GLBuffers::TEXCOORD_VB, GLBuffers::TEXCOORD_LOCATION, 2, GL_FLOAT, 0, 0);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ModelBuffers[INDEX_BUFFER]);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices[0]) * Indices.size(), &Indices[0], GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    ModelBuffers.BufferData(GLBuffers::INDEX_BUFFER, sizeof(Indices[0]) * Indices.size(), &Indices[0], GL_ELEMENT_ARRAY_BUFFER);
     glBindVertexArray(0);
 
-    Dragon.mPosition = v3(0.0f);
-    Dragon.mRotation = v3(0.0f, 0.0f, 0.0f);
-    Dragon.mScale    = v3(0.008f);
+    for(u32 MeshIdx = 0; MeshIdx < Dragon.mMeshes.size(); ++MeshIdx) {
+        Material &Mat = Dragon.mMeshes[MeshIdx].mMaterial;
+        std::vector<Texture>::const_iterator Begin = ModelTextures.begin();
+        std::vector<Texture>::const_iterator End = ModelTextures.end();
+        // TODO(Jovan): Maybe avoid lambdas?
+        auto CustomLambda = [&](const std::string &str1) { return [&](const Texture &t) { return t.mPath == str1; }; };
+        if(!Mat.mDiffusePath.empty() && std::find_if(Begin, End, CustomLambda(Mat.mDiffusePath)) == End) {
+            Texture Diffuse(Mat.mDiffusePath, Texture::DIFFUSE);
+            Mat.mDiffuseTextureId = Diffuse.mId;
+            ModelTextures.push_back(Diffuse);
+        } else if(!Mat.mSpecularPath.empty() && std::find_if(Begin, End, CustomLambda(Mat.mSpecularPath)) == End) {
+            Texture Specular(Mat.mSpecularPath, Texture::SPECULAR);
+            Mat.mSpecularTextureId = Specular.mId;
+            ModelTextures.push_back(Specular);
+        }
+    }
 
     // NOTE(Jovan): Camera init
     Camera OrbitalCamera(45.0f, 2.0f);
@@ -365,6 +393,7 @@ main() {
     SceneWindow Scene("Scene", ImGuiWindowFlags_AlwaysAutoResize);
     ModelWindow ModelWindow("Model", ImGuiWindowFlags_AlwaysAutoResize);
 
+    glEnable(GL_TEXTURE_2D);
     while(!glfwWindowShouldClose(Window)) {
 
         StartTime = glfwGetTime();
@@ -400,7 +429,7 @@ main() {
         glViewport(0, 0, State.mFramebufferSize.X, State.mFramebufferSize.Y);
 
         // NOTE(Jovan): Render model
-        RenderModel(Dragon, Phong, RunningTime, ModelVAO, ModelBuffers[INDEX_BUFFER]);
+        RenderModel(Dragon, Phong, RunningTime, ModelVAO, ModelBuffers.mIds[GLBuffers::INDEX_BUFFER]);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glEnable(GL_DEPTH_TEST);

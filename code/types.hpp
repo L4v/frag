@@ -19,4 +19,11 @@ typedef float r32;
 typedef double r64;
 typedef u32 b32;
 
+const char PATH_SEPARATOR =
+#ifdef _WIN32
+'\\';
+#else
+'/';
+#endif
+
 #endif

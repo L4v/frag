@@ -10,22 +10,34 @@
 #include "include/glad/glad.h"
 #include "math3d.hpp"
 
-#define POSITION_LOCATION    0
-#define TEX_COORD_LOCATION   1
-#define NORMAL_LOCATION      2
-#define BONE_ID_LOCATION     3
-#define BONE_WEIGHT_LOCATION 4
-
 #define POINT_LIGHT_COUNT 1
 
-enum EBufferType {
-    INDEX_BUFFER = 0,
-    POS_VB,
-    TEXCOORD_VB,
-    NORM_VB,
-    BONE_VB,
+struct GLBuffers {
+    enum EBufferType {
+        INDEX_BUFFER = 0,
+        POS_VB,
+        TEXCOORD_VB,
+        NORM_VB,
+        BONE_VB,
 
-    BUFFER_COUNT,
+        BUFFER_COUNT,
+    };
+
+    enum EBufferLocations {
+        POSITION_LOCATION = 0,
+        TEXCOORD_LOCATION = 1,
+        NORMAL_LOCATION = 2,
+        BONE_ID_LOCATION,
+        BONE_WEIGHT_LOCATION
+    };
+
+    u32 mIds[BUFFER_COUNT];
+
+    GLBuffers();
+    void Destroy();
+    void BufferData(EBufferType type, GLsizeiptr size, const void *data, GLenum target = GL_ARRAY_BUFFER, GLenum usage = GL_STATIC_DRAW);
+    void SetPointer(EBufferType bufferType, GLuint index, GLint size, GLenum type, GLsizei stride, const void *pointer, GLboolean normalized = GL_FALSE, GLenum target = GL_ARRAY_BUFFER);
+    
 };
 
 struct Texture {
@@ -40,6 +52,7 @@ struct Texture {
     ETextureType mType;
     std::string  mPath;
     Texture(const std::string &path, ETextureType type);
+    ~Texture();
 };
 
 class ShaderProgram {
