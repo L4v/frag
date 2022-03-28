@@ -295,7 +295,7 @@ main() {
     ShaderProgram RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
     ShaderProgram Debug("../shaders/debug.vert", "../shaders/debug.frag");
 
-    Model Dragon("../res/models/backpack.obj");
+    Model Dragon("../res/models/skinning0.gltf");
     
     Dragon.mPosition = v3(0.0f);
     Dragon.mRotation = v3(0.0f, 0.0f, 0.0f);
@@ -309,7 +309,7 @@ main() {
     std::vector<Texture> ModelTextures;
 
     if(!Dragon.Load(Vertices, Normals, TexCoords, Indices)) {
-        std::cerr << "[err] failed to load amongus.obj" << std::endl;
+        std::cerr << "[err] failed to load " << Dragon.mFilepath << std::endl;
     }
 
     glGenVertexArrays(1, &ModelVAO);
