@@ -6,6 +6,47 @@ Model::Model(const std::string &filePath) {
     mDirectory = mFilepath.substr(0, mFilepath.find_last_of(PATH_SEPARATOR));
 }
 
+
+void
+VertexBoneData::AddBoneData(u32 id, r32 weight) {
+    for(u32 i = 0; i < ArrayCount(mWeights); ++i) {
+        if(!mWeights[i]) {
+            mIds[i] = id;
+            mWeights[i] = weight;
+            std::cout << " bone: " << id << " weight: " << weight << " index: " << id << std::endl;
+            return;
+        }
+    }
+}
+
+u32
+Model::GetBoneId(const aiBone *pBone) {
+    std::string BoneName(pBone->mName.C_Str());
+    u32 BoneId = 0;
+    if(mBoneNameToIndex.find(BoneName) == mBoneNameToIndex.end()) {
+        mBoneNameToIndex[BoneName] = mBoneNameToIndex.size();
+    } else {
+        BoneId = mBoneNameToIndex[BoneName];
+    }
+
+    return BoneId;
+}
+
+void
+Model::ParseBone(u32 meshId, const aiBone *pBone) {
+    u32 BoneId = GetBoneId(pBone);
+    for(u32 WeightIdx = 0; WeightIdx < pBone->mNumWeights; ++WeightIdx) {
+        if(WeightIdx == 0) {
+            std::cout << std::endl;
+        }
+        const aiVertexWeight &VertWeight = pBone->mWeights[WeightIdx];
+        u32 GlobalVertexId = meshId + VertWeight.mVertexId;
+        mVertexBoneData[GlobalVertexId].AddBoneData(BoneId, VertWeight.mWeight);
+        std::cout << "Vertex: " << GlobalVertexId << " ";
+    }
+    std::cout << std::endl;
+}
+
 bool
 Model::Load(std::vector<v3> &vertices, std::vector<v3> &normals, std::vector<v2> &texCoords, std::vector<u32> &indices) {
     
@@ -20,14 +61,22 @@ Model::Load(std::vector<v3> &vertices, std::vector<v3> &normals, std::vector<v2>
     mNumVertices = 0;
     mNumIndices = 0;
     for(u32 MeshIdx = 0; MeshIdx < mScene->mNumMeshes; ++MeshIdx) {
-        const aiMesh *Mesh = mScene->mMeshes[MeshIdx];
+        const aiMesh *MeshAI = mScene->mMeshes[MeshIdx];
+        Mesh &CurrMesh = mMeshes[MeshIdx];
         // NOTE(Jovan): Triangulated data
-        mMeshes[MeshIdx].mNumIndices = Mesh->mNumFaces * 3;
-        mMeshes[MeshIdx].mBaseVertex = mNumVertices;
-        mMeshes[MeshIdx].mBaseIndex = mNumIndices;
+        CurrMesh.mNumIndices = MeshAI->mNumFaces * 3;
+        CurrMesh.mBaseVertex = mNumVertices;
+        CurrMesh.mBaseIndex = mNumIndices;
 
-        mNumVertices += Mesh->mNumVertices;
-        mNumIndices += mMeshes[MeshIdx].mNumIndices;
+        mNumVertices += MeshAI->mNumVertices;
+        mNumIndices += CurrMesh.mNumIndices;
+
+        mVertexBoneData.resize(mNumVertices);
+        if(MeshAI->HasBones()) {
+            for(u32 BoneIdx = 0; BoneIdx < MeshAI->mNumBones; ++BoneIdx) {
+                ParseBone(CurrMesh.mBaseVertex, MeshAI->mBones[BoneIdx]);
+            }
+        }
     }
 
     vertices.reserve(mNumVertices);

@@ -4,8 +4,9 @@
 #include <string>
 #include <algorithm>
 
-#include "ui.hpp"
+#include "frag.hpp"
 #include "types.hpp"
+#include "ui.hpp"
 #include "shader.hpp"
 #include "model.hpp"
 
@@ -295,7 +296,7 @@ main() {
     ShaderProgram RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
     ShaderProgram Debug("../shaders/debug.vert", "../shaders/debug.frag");
 
-    Model Dragon("../res/models/skinning0.gltf");
+    Model Dragon("../res/boblampclean.md5mesh");
     
     Dragon.mPosition = v3(0.0f);
     Dragon.mRotation = v3(0.0f, 0.0f, 0.0f);

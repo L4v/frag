@@ -2,8 +2,6 @@
 #define FRAG_HPP
 #include "math3d.hpp"
 
-#define ArrayCount(array) (sizeof(array) / sizeof(array[0]))
-
 // TODO(Jovan): In separate file?
 // TODO(Jovan): Panning?
 class Camera {
