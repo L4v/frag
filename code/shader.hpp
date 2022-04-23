@@ -12,6 +12,18 @@
 
 #define POINT_LIGHT_COUNT 1
 
+struct Light {
+    r32 Size;
+    r32 Kc;
+    r32 Kl;
+    r32 Kq;
+
+    v3 Position;
+    v3 Ambient;
+    v3 Diffuse;
+    v3 Specular;
+};
+
 struct GLBuffers {
     enum EBufferType {
         INDEX_BUFFER = 0,
@@ -25,8 +37,8 @@ struct GLBuffers {
 
     enum EBufferLocations {
         POSITION_LOCATION = 0,
-        TEXCOORD_LOCATION = 1,
-        NORMAL_LOCATION = 2,
+        TEXCOORD_LOCATION,
+        NORMAL_LOCATION,
         BONE_ID_LOCATION,
         BONE_WEIGHT_LOCATION
     };
@@ -37,6 +49,7 @@ struct GLBuffers {
     void Destroy();
     void BufferData(EBufferType type, GLsizeiptr size, const void *data, GLenum target = GL_ARRAY_BUFFER, GLenum usage = GL_STATIC_DRAW);
     void SetPointer(EBufferType bufferType, GLuint index, GLint size, GLenum type, GLsizei stride, const void *pointer, GLboolean normalized = GL_FALSE, GLenum target = GL_ARRAY_BUFFER);
+    void SetIPointer(EBufferType bufferType, GLuint index, GLint size, GLenum type, GLsizei stride, const void *pointer, GLenum target = GL_ARRAY_BUFFER);
     
 };
 
@@ -60,6 +73,7 @@ public:
     u32 mId;
 
     ShaderProgram(const std::string &vShaderPath, const std::string &fShaderPath);
+    void SetPointLight(const Light &light, u32 index);
     void SetUniform1i(const std::string &uniform, i32 i) const;
     void SetUniform1f(const std::string &uniform, r32 f) const;
     void SetUniform3f(const std::string &uniform, const v3 &v) const;

@@ -22,6 +22,14 @@ GLBuffers::SetPointer(EBufferType bufferType, GLuint index, GLint size, GLenum t
 }
 
 void
+GLBuffers::SetIPointer(EBufferType bufferType, GLuint index, GLint size, GLenum type, GLsizei stride, const void *pointer, GLenum target) {
+    glBindBuffer(target, mIds[bufferType]);
+    glVertexAttribIPointer(index, size, type, stride, pointer);
+    glEnableVertexAttribArray(index);
+    glBindBuffer(target, 0);
+}
+
+void
 GLBuffers::BufferData(EBufferType type, GLsizeiptr size, const void *data, GLenum target, GLenum usage) {
     glBindBuffer(target, mIds[type]);
     glBufferData(target, size, data, usage);
@@ -127,10 +135,20 @@ ShaderProgram::createBasicProgram(u32 vShader, u32 fShader) {
 }
 
 void
+ShaderProgram::SetPointLight(const Light &light, u32 index) {
+    SetUniform3f("uPointLights[0].Ambient", light.Ambient);
+    SetUniform3f("uPointLights[0].Diffuse", light.Diffuse);
+    SetUniform3f("uPointLights[0].Specular", light.Specular);
+    SetUniform3f("uPointLights[0].Position", light.Position);
+    SetUniform1f("uPointLights[0].Kc", light.Kc);
+    SetUniform1f("uPointLights[0].Kl", light.Kl);
+    SetUniform1f("uPointLights[0].Kq", light.Kq);
+}
+
+void
 ShaderProgram::SetUniform1i(const std::string &uniform, i32 i) const {
     glUniform1i(glGetUniformLocation(mId, uniform.c_str()), i);
 }
-
 
 void
 ShaderProgram::SetUniform1f(const std::string &uniform, r32 f) const {

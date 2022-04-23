@@ -13,15 +13,15 @@ public:
     r32         mDistance;
     r32         mZoomSpeed;
 
-    v3 mWorldUp;
-    v3 mPosition;
-    v3 mFront;
-    v3 mUp;
-    v3 mRight;
-    v3 mTarget;
+    v3          mWorldUp;
+    v3          mPosition;
+    v3          mFront;
+    v3          mUp;
+    v3          mRight;
+    v3          mTarget;
 
     // NOTE(Jovan): Orbital camera constructor
-    Camera(r32 fov, r32 distance, r32 rotateSpeed = 1.0f, r32 zoomSpeed = 20.0f, const v3 &worldUp = v3(0.0f, 1.0f, 0.0f), const v3 &target = v3(0.0f)) {
+    Camera(r32 fov, r32 distance, r32 rotateSpeed = 1e-3f, r32 zoomSpeed = 2e-2f, const v3 &worldUp = v3(0.0f, 1.0f, 0.0f), const v3 &target = v3(0.0f)) {
         mFOV = fov;
         mDistance = distance;
         mRotateSpeed = rotateSpeed;
@@ -84,9 +84,9 @@ private:
 
 struct EngineState {
     Camera    *mCamera;
-    m44 mProjection;
-    v2 mCursorPos;
-    v2 mFramebufferSize;
+    m44       mProjection;
+    v2        mCursorPos;
+    v2        mFramebufferSize;
     r32       mDT;
     u32       mFBOTexture;
 
@@ -94,6 +94,8 @@ struct EngineState {
     bool      mFirstMouse;
     bool      mLeftMouse;
     bool      mImGUIInitialized;
+
+    u32       mDebugBoneIdx;
 
     EngineState(Camera *camera) {
         mCamera = camera;

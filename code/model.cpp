@@ -10,21 +10,28 @@ Model::Model(const std::string &filePath) {
 void
 VertexBoneData::AddBoneData(u32 id, r32 weight) {
     for(u32 i = 0; i < ArrayCount(mWeights); ++i) {
-        if(!mWeights[i]) {
+        if(mWeights[i] == 0.0f) {
             mIds[i] = id;
             mWeights[i] = weight;
-            std::cout << " bone: " << id << " weight: " << weight << " index: " << id << std::endl;
             return;
         }
     }
 }
 
+void
+BoneInfos::AddBoneInfo(const aiMatrix4x4 &offset) {
+    mOffsets.push_back(m44(&offset[0][0]));
+    mFinalTransforms.push_back(m44());
+    ++mCount;
+}
+
 u32
 Model::GetBoneId(const aiBone *pBone) {
-    std::string BoneName(pBone->mName.C_Str());
     u32 BoneId = 0;
+    std::string BoneName(pBone->mName.C_Str());
     if(mBoneNameToIndex.find(BoneName) == mBoneNameToIndex.end()) {
-        mBoneNameToIndex[BoneName] = mBoneNameToIndex.size();
+        BoneId = mBoneNameToIndex.size();
+        mBoneNameToIndex[BoneName] = BoneId;
     } else {
         BoneId = mBoneNameToIndex[BoneName];
     }
@@ -33,18 +40,18 @@ Model::GetBoneId(const aiBone *pBone) {
 }
 
 void
-Model::ParseBone(u32 meshId, const aiBone *pBone) {
+Model::LoadBone(u32 baseVertex, const aiBone *pBone) {
     u32 BoneId = GetBoneId(pBone);
-    for(u32 WeightIdx = 0; WeightIdx < pBone->mNumWeights; ++WeightIdx) {
-        if(WeightIdx == 0) {
-            std::cout << std::endl;
-        }
-        const aiVertexWeight &VertWeight = pBone->mWeights[WeightIdx];
-        u32 GlobalVertexId = meshId + VertWeight.mVertexId;
-        mVertexBoneData[GlobalVertexId].AddBoneData(BoneId, VertWeight.mWeight);
-        std::cout << "Vertex: " << GlobalVertexId << " ";
+
+    if(BoneId == mBoneInfos.mCount) {
+        mBoneInfos.AddBoneInfo(pBone->mOffsetMatrix);
     }
-    std::cout << std::endl;
+
+    for(u32 WeightIdx = 0; WeightIdx < pBone->mNumWeights; ++WeightIdx) {
+        const aiVertexWeight &VertWeight = pBone->mWeights[WeightIdx];
+        u32 GlobalVertexId = baseVertex + VertWeight.mVertexId;
+        mBones[GlobalVertexId].AddBoneData(BoneId, VertWeight.mWeight);
+    }
 }
 
 bool
@@ -63,7 +70,7 @@ Model::Load(std::vector<v3> &vertices, std::vector<v3> &normals, std::vector<v2>
     for(u32 MeshIdx = 0; MeshIdx < mScene->mNumMeshes; ++MeshIdx) {
         const aiMesh *MeshAI = mScene->mMeshes[MeshIdx];
         Mesh &CurrMesh = mMeshes[MeshIdx];
-        // NOTE(Jovan): Triangulated data
+
         CurrMesh.mNumIndices = MeshAI->mNumFaces * 3;
         CurrMesh.mBaseVertex = mNumVertices;
         CurrMesh.mBaseIndex = mNumIndices;
@@ -71,22 +78,18 @@ Model::Load(std::vector<v3> &vertices, std::vector<v3> &normals, std::vector<v2>
         mNumVertices += MeshAI->mNumVertices;
         mNumIndices += CurrMesh.mNumIndices;
 
-        mVertexBoneData.resize(mNumVertices);
-        if(MeshAI->HasBones()) {
-            for(u32 BoneIdx = 0; BoneIdx < MeshAI->mNumBones; ++BoneIdx) {
-                ParseBone(CurrMesh.mBaseVertex, MeshAI->mBones[BoneIdx]);
-            }
-        }
     }
 
     vertices.reserve(mNumVertices);
     normals.reserve(mNumVertices);
     texCoords.reserve(mNumVertices);
+    mBones.resize(mNumVertices);
     indices.reserve(mNumIndices);
 
     for(u32 MeshIdx = 0; MeshIdx < mMeshes.size(); ++MeshIdx) {
         const aiMesh *MeshAI = mScene->mMeshes[MeshIdx];
         const aiVector3D Zero3D(0.0f, 0.0f, 0.0f);
+        Mesh &CurrMesh = mMeshes[MeshIdx];
         for(u32 VertexIdx = 0; VertexIdx < MeshAI->mNumVertices; ++VertexIdx) {
             const aiVector3D *Vertex = &MeshAI->mVertices[VertexIdx];
             const aiVector3D *Normal = &MeshAI->mNormals[VertexIdx];
@@ -107,20 +110,56 @@ Model::Load(std::vector<v3> &vertices, std::vector<v3> &normals, std::vector<v2>
             indices.push_back(Face.mIndices[2]);
         }
 
+        if(MeshAI->HasBones()) {
+            for(u32 BoneIdx = 0; BoneIdx < MeshAI->mNumBones; ++BoneIdx) {
+                LoadBone(CurrMesh.mBaseVertex, MeshAI->mBones[BoneIdx]);
+            }
+        }
+
         const aiMaterial *MaterialAI = mScene->mMaterials[MeshAI->mMaterialIndex];
         u32 DiffuseCount = MaterialAI->GetTextureCount(aiTextureType_DIFFUSE);
         u32 SpecularCount = MaterialAI->GetTextureCount(aiTextureType_SPECULAR);
         aiString PathAI;
  
         if(DiffuseCount && MaterialAI->GetTexture(aiTextureType_DIFFUSE, 0, &PathAI, 0, 0, 0, 0, 0) == AI_SUCCESS) {
-            mMeshes[MeshIdx].mMaterial.mDiffusePath = mDirectory + PATH_SEPARATOR + std::string(PathAI.data);
+            CurrMesh.mMaterial.mDiffusePath = mDirectory + PATH_SEPARATOR + std::string(PathAI.data);
         }
 
         if(SpecularCount && MaterialAI->GetTexture(aiTextureType_SPECULAR, 0, &PathAI, 0, 0, 0, 0, 0) == AI_SUCCESS) {
             std::string Path = mDirectory + PATH_SEPARATOR + std::string(PathAI.data);
-            mMeshes[MeshIdx].mMaterial.mSpecularPath = mDirectory + PATH_SEPARATOR + std::string(PathAI.data);
+            CurrMesh.mMaterial.mSpecularPath = mDirectory + PATH_SEPARATOR + std::string(PathAI.data);
         }
     }
 
     return true;
+}
+
+void
+Model::LoadBoneTransforms(std::vector<m44> &transforms) {
+    transforms.resize(mBoneInfos.mCount);
+
+    m44 Identity;
+    Identity.LoadIdentity();
+
+    ReadNodeHierarchy(mScene->mRootNode, Identity);
+    for(u32 BoneInfoIdx = 0; BoneInfoIdx < mBoneInfos.mCount; ++BoneInfoIdx) {
+        transforms[BoneInfoIdx] = mBoneInfos.mFinalTransforms[BoneInfoIdx];
+    }
+}
+
+void
+Model::ReadNodeHierarchy(const aiNode *pNode, const m44 &parentTransform) {
+    std::string Name(pNode->mName.data);
+    m44 NodeTransform(&pNode->mTransformation[0][0]);
+    std::cout << Name << " - ";
+    m44 GlobalTransform = parentTransform * NodeTransform;
+
+    if(mBoneNameToIndex.find(Name) != mBoneNameToIndex.end()) {
+        u32 BoneIndex = mBoneNameToIndex[Name];
+        mBoneInfos.mFinalTransforms[BoneIndex] = GlobalTransform * mBoneInfos.mOffsets[BoneIndex];
+    }
+
+    for(u32 ChildIdx = 0; ChildIdx < pNode->mNumChildren; ++ChildIdx) {
+        ReadNodeHierarchy(pNode->mChildren[ChildIdx], GlobalTransform);
+    }
 }

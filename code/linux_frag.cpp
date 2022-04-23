@@ -13,18 +13,6 @@
 internal i32 _WindowWidth = 800;
 internal i32 _WindowHeight = 600;
 
-struct Light {
-    r32 Size;
-    r32 Kc;
-    r32 Kl;
-    r32 Kq;
-
-    v3 Position;
-    v3 Ambient;
-    v3 Diffuse;
-    v3 Specular;
-};
-
 void
 _CreateFramebuffer(u32 *fbo, u32 *rbo, u32 *texture, i32 width, i32 height) {
     // TODO(Jovan): Tidy up
@@ -68,6 +56,10 @@ internal void
 _KeyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action, i32 mods) {
     EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
 
+    if(key == GLFW_KEY_SPACE && action == GLFW_RELEASE) {
+        State->mDebugBoneIdx = (State->mDebugBoneIdx + 1) % 34;
+    }
+
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
@@ -97,127 +89,9 @@ _ScrollCallback(GLFWwindow *window, r64 xoffset, r64 yoffset) {
     }
 }
 
-void
-RenderCube() {
-    static bool IsLoaded = false;
-    static u32 VAO;
-    GLBuffers CubeBuffers;
-    u32 Buffers[GLBuffers::BUFFER_COUNT] = {0};
-    static u32 IndexCount = 0;
-    if (!IsLoaded) {
-        std::cout << "Loading cube" << std::endl;
-
-        std::vector<v3> Vertices = {
-            v3(-0.5f, -0.5f, -0.5f), 
-            v3( 0.5f, -0.5f, -0.5f), 
-            v3(-0.5f,  0.5f, -0.5f), 
-            v3( 0.5f,  0.5f, -0.5f), 
-            v3(-0.5f, -0.5f,  0.5f), 
-            v3( 0.5f, -0.5f,  0.5f), 
-            v3(-0.5f,  0.5f,  0.5f), 
-            v3( 0.5f,  0.5f,  0.5f), 
-            v3(-0.5f,  0.5f,  0.5f), 
-            v3(-0.5f,  0.5f, -0.5f), 
-            v3(-0.5f, -0.5f,  0.5f), 
-            v3(-0.5f, -0.5f, -0.5f), 
-            v3(0.5f,  0.5f,  0.5f),  
-            v3(0.5f,  0.5f, -0.5f),  
-            v3(0.5f, -0.5f,  0.5f),  
-            v3(0.5f, -0.5f, -0.5f),  
-            v3(-0.5f, -0.5f, -0.5f), 
-            v3( 0.5f, -0.5f, -0.5f), 
-            v3(-0.5f, -0.5f,  0.5f), 
-            v3( 0.5f, -0.5f,  0.5f), 
-            v3(-0.5f,  0.5f, -0.5f), 
-            v3( 0.5f,  0.5f, -0.5f), 
-            v3(-0.5f,  0.5f,  0.5f), 
-            v3( 0.5f,  0.5f,  0.5f)
-        };
-
-        std::vector<v3> Normals = {
-            v3(0.0f, 0.0f, 1.0f),  
-            v3(0.0f, 0.0f, 1.0f),  
-            v3(0.0f, 0.0f, 1.0f),  
-            v3(0.0f, 0.0f, 1.0f),  
-            v3(0.0f, 0.0f, -1.0f), 
-            v3(0.0f, 0.0f, -1.0f), 
-            v3(0.0f, 0.0f, -1.0f), 
-            v3(0.0f, 0.0f, -1.0f), 
-            v3(-1.0f, 0.0f, 0.0f), 
-            v3(-1.0f, 0.0f, 0.0f), 
-            v3(-1.0f, 0.0f, 0.0f), 
-            v3(-1.0f, 0.0f, 0.0f), 
-            v3(1.0f, 0.0f, 0.0f),  
-            v3(1.0f, 0.0f, 0.0f),  
-            v3(1.0f, 0.0f, 0.0f),  
-            v3(1.0f, 0.0f, 0.0f),  
-            v3(0.0f, -1.0f, 0.0f), 
-            v3(0.0f, -1.0f, 0.0f), 
-            v3(0.0f, -1.0f, 0.0f), 
-            v3(0.0f, -1.0f, 0.0f), 
-            v3(0.0f, 1.0f, 0.0f),  
-            v3(0.0f, 1.0f, 0.0f),  
-            v3(0.0f, 1.0f, 0.0f),  
-            v3(0.0f, 1.0f, 0.0f)   
-        };
-
-        u32 Indices[] = {
-            // NEAR
-            0, 1, 2,
-            2, 1, 3,
-
-            // FAR
-            4, 5, 6,
-            6, 5, 7,
-
-            // LEFT
-            8, 9, 10,
-            10, 9, 11,
-
-            // RIGHT
-            12, 13, 14,
-            14, 13, 15,
-
-            // BOTTOM
-            16, 17, 18,
-            18, 17, 19,
-
-            // TOP
-            20, 21, 22,
-            22, 21, 23
-        };
-
-        glGenVertexArrays(1, &VAO);
-        glGenBuffers(GLBuffers::BUFFER_COUNT, Buffers);
-        glBindVertexArray(VAO);
-
-
-        glBindBuffer(GL_ARRAY_BUFFER, Buffers[GLBuffers::POS_VB]);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertices[0]) * Vertices.size() , &Vertices[0], GL_STATIC_DRAW);
-
-        glVertexAttribPointer(GLBuffers::POSITION_LOCATION, 3, GL_FLOAT, GL_FALSE, 0, (void*)(0));
-        glEnableVertexAttribArray(GLBuffers::POSITION_LOCATION);
-
-        glBindBuffer(GL_ARRAY_BUFFER, Buffers[GLBuffers::NORM_VB]);
-        glVertexAttribPointer(GLBuffers::NORMAL_LOCATION, 3, GL_FLOAT, GL_FALSE, 0, (void*)(0));
-        glEnableVertexAttribArray(GLBuffers::NORMAL_LOCATION);
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[GLBuffers::INDEX_BUFFER]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-        glBindVertexArray(0);
-        IndexCount = ArrayCount(Indices);
-        IsLoaded = true;
-    }
-
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[GLBuffers::INDEX_BUFFER]);
-    glDrawElementsBaseVertex(GL_TRIANGLES, IndexCount, GL_UNSIGNED_INT, (void*)0, 0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+internal inline r64
+_CurrentTimeInMillis() {
+    return glfwGetTime() * 1000.0;
 }
 
 void
@@ -231,6 +105,7 @@ RenderModel(Model &model, ShaderProgram &program, r32 runningTime, u32 vao, u32 
         .Rotate(quat(v3(0.0f, 0.0f, 1.0f), model.mRotation.Z))
         .Scale(model.mScale);
     program.SetUniform4m("uModel", model.mModel);
+    program.SetUniform4m("uBones", model.mBoneInfos.mFinalTransforms);
 
     glBindVertexArray(vao);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
@@ -299,8 +174,8 @@ main() {
     Model Dragon("../res/boblampclean.md5mesh");
     
     Dragon.mPosition = v3(0.0f);
-    Dragon.mRotation = v3(0.0f, 0.0f, 0.0f);
-    Dragon.mScale    = v3(0.8f);
+    Dragon.mRotation = v3(-90.0f, 0.0f, 0.0f);
+    Dragon.mScale    = v3(0.08f);
 
     u32 ModelVAO;
     std::vector<v2> TexCoords;
@@ -308,10 +183,12 @@ main() {
     std::vector<v3> Normals;
     std::vector<u32> Indices;
     std::vector<Texture> ModelTextures;
+    std::vector<m44> BoneTransforms;
 
     if(!Dragon.Load(Vertices, Normals, TexCoords, Indices)) {
         std::cerr << "[err] failed to load " << Dragon.mFilepath << std::endl;
     }
+    Dragon.LoadBoneTransforms(BoneTransforms);
 
     glGenVertexArrays(1, &ModelVAO);
     glBindVertexArray(ModelVAO);
@@ -324,6 +201,11 @@ main() {
 
     ModelBuffers.BufferData(GLBuffers::TEXCOORD_VB, sizeof(TexCoords[0]) * TexCoords.size(), &TexCoords[0]);
     ModelBuffers.SetPointer(GLBuffers::TEXCOORD_VB, GLBuffers::TEXCOORD_LOCATION, 2, GL_FLOAT, 0, 0);
+
+    ModelBuffers.BufferData(GLBuffers::BONE_VB, sizeof(VertexBoneData) * Dragon.mBones.size(), &Dragon.mBones[0]);
+    ModelBuffers.SetIPointer(GLBuffers::BONE_VB, GLBuffers::BONE_ID_LOCATION, NUM_BONES_PER_VERTEX, GL_INT, sizeof(VertexBoneData), 0);
+    ModelBuffers.SetPointer(GLBuffers::BONE_VB, GLBuffers::BONE_WEIGHT_LOCATION, NUM_BONES_PER_VERTEX, GL_FLOAT, sizeof(VertexBoneData),
+           (const GLvoid*)(NUM_BONES_PER_VERTEX * sizeof(u32)));
 
     ModelBuffers.BufferData(GLBuffers::INDEX_BUFFER, sizeof(Indices[0]) * Indices.size(), &Indices[0], GL_ELEMENT_ARRAY_BUFFER);
     glBindVertexArray(0);
@@ -366,22 +248,21 @@ main() {
     PointLight.Kl = 0.09f;
     PointLight.Kq = 0.032f;
     PointLight.Position = v3(0.0f, 1.0f, 2.0f);
-    Phong.SetUniform3f("uPointLights[0].Ambient", PointLight.Ambient);
-    Phong.SetUniform3f("uPointLights[0].Diffuse", PointLight.Diffuse);
-    Phong.SetUniform3f("uPointLights[0].Specular", PointLight.Specular);
-    Phong.SetUniform3f("uPointLights[0].Position", PointLight.Position);
-    Phong.SetUniform1f("uPointLights[0].Kc", PointLight.Kc);
-    Phong.SetUniform1f("uPointLights[0].Kl", PointLight.Kl);
-    Phong.SetUniform1f("uPointLights[0].Kq", PointLight.Kq);
+    Phong.SetPointLight(PointLight, 0);
+
+    glUseProgram(RiggedPhong.mId);
+    RiggedPhong.SetUniform1f("uTexScale", 1.0f);
+    RiggedPhong.SetPointLight(PointLight, 0);
+    glUseProgram(Phong.mId);
 
     u32 FBO, RBO;
     _CreateFramebuffer(&FBO, &RBO, &State.mFBOTexture, State.mFramebufferSize.X, State.mFramebufferSize.Y);
 
-    r32 StartTime = glfwGetTime();
-    r32 EndTime = glfwGetTime();
-    r32 BeginTime = glfwGetTime();
-    r32 RunningTime = glfwGetTime();
-    State.mDT = EndTime - StartTime;
+    r32 StartTimeMillis = _CurrentTimeInMillis();
+    r32 EndTimeMillis = _CurrentTimeInMillis();
+    r32 BeginTimeMillis = _CurrentTimeInMillis();
+    r32 RunningTimeMillis = _CurrentTimeInMillis();
+    State.mDT = EndTimeMillis - StartTimeMillis;
 
     u32 OldFBO;
     u32 OldRBO;
@@ -397,8 +278,8 @@ main() {
     glEnable(GL_TEXTURE_2D);
     while(!glfwWindowShouldClose(Window)) {
 
-        StartTime = glfwGetTime();
-        RunningTime = glfwGetTime() - BeginTime;
+        StartTimeMillis = _CurrentTimeInMillis();
+        RunningTimeMillis = _CurrentTimeInMillis() - BeginTimeMillis;
         
         glUseProgram(Phong.mId);
         if(Scene.mHasResized) {
@@ -429,8 +310,21 @@ main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(0, 0, State.mFramebufferSize.X, State.mFramebufferSize.Y);
 
+        // glUseProgram(Debug.mId);
+        // Debug.SetUniform4m("uProjection", State.mProjection);
+        // Debug.SetUniform3f("uViewPos", State.mCamera->mPosition);
+        // Debug.SetUniform4m("uView", View);
+        // Debug.SetUniform1i("uDisplayBoneIdx", State.mDebugBoneIdx);
+
+        glUseProgram(RiggedPhong.mId);
+        RiggedPhong.SetUniform4m("uProjection", State.mProjection);
+        RiggedPhong.SetUniform3f("uViewPos", State.mCamera->mPosition);
+        RiggedPhong.SetUniform4m("uView", View);
+        RiggedPhong.SetUniform1i("uDisplayBoneIdx", State.mDebugBoneIdx);
+
         // NOTE(Jovan): Render model
-        RenderModel(Dragon, Phong, RunningTime, ModelVAO, ModelBuffers.mIds[GLBuffers::INDEX_BUFFER]);
+        RenderModel(Dragon, RiggedPhong, RunningTimeMillis, ModelVAO, ModelBuffers.mIds[GLBuffers::INDEX_BUFFER]);
+        glUseProgram(Phong.mId);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glEnable(GL_DEPTH_TEST);
@@ -453,8 +347,8 @@ main() {
 
         RenderUI();
 
-        EndTime = glfwGetTime();
-        State.mDT = EndTime - StartTime;
+        EndTimeMillis = _CurrentTimeInMillis();
+        State.mDT = EndTimeMillis - StartTimeMillis;
 
         glfwSwapBuffers(Window);
         glfwPollEvents();

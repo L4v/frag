@@ -7,6 +7,7 @@
 #include <map>
 #include <iostream>
 
+#include "types.hpp"
 #include "include/glad/glad.h"
 
 #include "math3d.hpp"
@@ -14,7 +15,8 @@
 
 #define POSTPROCESS_FLAGS (aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals | aiProcess_JoinIdenticalVertices)
 #define INVALID_MATERIAL 0xFFFFFFFF
-#define NUM_BONES_PER_VERTEX 4
+
+global const u32 NUM_BONES_PER_VERTEX = 4;
 
 struct Material {
     u32 mDiffuseTextureId;
@@ -43,12 +45,21 @@ struct VertexBoneData {
     void AddBoneData(u32 id, r32 weight);
 };
 
+struct BoneInfos {
+    std::vector<m44> mOffsets;
+    std::vector<m44> mFinalTransforms;
+    u32              mCount = 0;
+
+    void AddBoneInfo(const aiMatrix4x4 &offset);
+};
+
 class Model {
 private:
     Assimp::Importer mImporter;
     const aiScene *mScene;
-
     u32 mNumIndices;
+
+    void ReadNodeHierarchy(const aiNode *pNode,const m44 &parentTransform);
 public:
     u32 mNumVertices;
     m44 mModel;
@@ -60,11 +71,16 @@ public:
     std::string mDirectory;
     std::vector<Mesh> mMeshes;
     std::map<std::string, u32> mBoneNameToIndex;
-    std::vector<VertexBoneData> mVertexBoneData;
+    std::vector<VertexBoneData> mBones;
+    BoneInfos mBoneInfos;
+
+
     Model(const std::string &filePath);
     bool Load(std::vector<v3> &vertices, std::vector<v3> &normals, std::vector<v2> &texCoords, std::vector<u32> &indices);
-    void ParseBone(u32 globalVertexId, const aiBone *pBone);
+    void LoadBone(u32 globalVertexId, const aiBone *pBone);
     u32 GetBoneId(const aiBone *pBone);
+    void LoadBoneTransforms(std::vector<m44> &transforms);
+
 };
 
 #define MESH_HP
