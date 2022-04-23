@@ -1,5 +1,4 @@
 #include "model.hpp"
-#include <assimp/Importer.hpp>
 
 Model::Model(const std::string &filePath) {
     mFilepath = filePath;
@@ -62,6 +61,8 @@ Model::Load(std::vector<v3> &vertices, std::vector<v3> &normals, std::vector<v2>
         std::cerr << "[Err] Failed to load " << mFilepath << std::endl;
         return false;
     }
+
+    mBoneInfos.mGlobalInverseTransform = ~m44(&mScene->mRootNode->mTransformation[0][0]);
 
     mMeshes.resize(mScene->mNumMeshes);
 
@@ -135,31 +136,69 @@ Model::Load(std::vector<v3> &vertices, std::vector<v3> &normals, std::vector<v2>
 }
 
 void
-Model::LoadBoneTransforms(std::vector<m44> &transforms) {
-    transforms.resize(mBoneInfos.mCount);
-
+Model::LoadBoneTransforms(r32 timeInSeconds, std::vector<m44> &transforms) {
     m44 Identity;
     Identity.LoadIdentity();
 
+    r32 TicksPerSecond = (r32)(mScene->mAnimations[0]->mTicksPerSecond != 0 ?
+        mScene->mAnimations[0]->mTicksPerSecond
+        : 25.0f);
+    r32 TimeInTicks = timeInSeconds * TicksPerSecond;
+    r32 AnimationTimeTicks = fmod(TimeInTicks, (r32)(mScene->mAnimations[0]->mDuration));
+
     ReadNodeHierarchy(mScene->mRootNode, Identity);
+    transforms.resize(mBoneInfos.mCount);
     for(u32 BoneInfoIdx = 0; BoneInfoIdx < mBoneInfos.mCount; ++BoneInfoIdx) {
         transforms[BoneInfoIdx] = mBoneInfos.mFinalTransforms[BoneInfoIdx];
     }
 }
 
+m44
+Model::CalcInterpolatedScaling(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim) {
+    if(pNodeAnim->mNumScalingKeys == 1) {
+        return m44(1.0f).Scale(v3(pNodeAnim->mScalingKeys[0].mValue.x, pNodeAnim->mScalingKeys[0].mValue.y, pNodeAnim->mScalingKeys[0].mValue.z));
+    }
+
+    u32 ScalingIndex = FindScaling(animationTimeInTicks, pNodeAnim);
+    u32 NextScalingIndex = ScalingIndex + 1;
+    r32 T1 = (r32)pNodeAnim->mScalingKeys[ScalingIndex].mTime
+    // TODO(Jovan): Continue from here 10:22 https://www.youtube.com/watch?v=gnnoPaStVzg
+}
+
 void
-Model::ReadNodeHierarchy(const aiNode *pNode, const m44 &parentTransform) {
+Model::ReadNodeHierarchy(r32 animationTimeInTicks, const aiNode *pNode, const m44 &parentTransform) {
     std::string Name(pNode->mName.data);
+
+    const aiAnimation *pAnimation = mScene->mAnimations[0];
     m44 NodeTransform(&pNode->mTransformation[0][0]);
-    std::cout << Name << " - ";
     m44 GlobalTransform = parentTransform * NodeTransform;
+    const aiNodeAnim *pNodeAnim = FindNodeAnim(pAnimation, Name);
+
+    if(aiNodeAnim) {
+        CalcInterpolatedScaling(animationTimeInTicks, pNodeAnim);
+    }
 
     if(mBoneNameToIndex.find(Name) != mBoneNameToIndex.end()) {
         u32 BoneIndex = mBoneNameToIndex[Name];
-        mBoneInfos.mFinalTransforms[BoneIndex] = GlobalTransform * mBoneInfos.mOffsets[BoneIndex];
+        mBoneInfos.mFinalTransforms[BoneIndex] = mBoneInfos.mGlobalInverseTransform * GlobalTransform * mBoneInfos.mOffsets[BoneIndex];
     }
 
     for(u32 ChildIdx = 0; ChildIdx < pNode->mNumChildren; ++ChildIdx) {
         ReadNodeHierarchy(pNode->mChildren[ChildIdx], GlobalTransform);
     }
 }
+
+aiNodeAnim*
+Model::FindNodeAnim(const aiAnimation *pAnimation, const std::string &nodeName) {
+    // TODO(Jovan): Do via map?
+    for(u32 ChannelIdx = 0; ChannelIdx < pAnimation->mNumChannels; ++ChannelIdx) {
+        aiNodeAnim *pNodeAnim = pAnimation->mChannels[ChannelIdx];
+
+        if(std::string(pNodeAnim->mNodeName.data) == nodeName) {
+            return pNodeAnim;
+        }
+    }
+
+    return 0;
+}
+

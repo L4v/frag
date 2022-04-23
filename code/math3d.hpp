@@ -581,6 +581,13 @@ struct m44 {
         return *this;
     }
 
+    inline m44& Scale(const r32 *x) {
+        (*this)[0] = x[0] * (*this)[0];
+        (*this)[1] = x[1] * (*this)[1];
+        (*this)[2] = x[2] * (*this)[2];
+        return *this;
+    }
+
     // TODO(Jovan): Optimize && check why reverse mul is required
     inline m44& Rotate(const quat &q) {
         *this = m44(q) * (*this);

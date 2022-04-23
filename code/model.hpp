@@ -6,6 +6,7 @@
 #include <vector>
 #include <map>
 #include <iostream>
+#include <cmath>
 
 #include "types.hpp"
 #include "include/glad/glad.h"
@@ -48,6 +49,7 @@ struct VertexBoneData {
 struct BoneInfos {
     std::vector<m44> mOffsets;
     std::vector<m44> mFinalTransforms;
+    m44              mGlobalInverseTransform;
     u32              mCount = 0;
 
     void AddBoneInfo(const aiMatrix4x4 &offset);
@@ -59,7 +61,12 @@ private:
     const aiScene *mScene;
     u32 mNumIndices;
 
-    void ReadNodeHierarchy(const aiNode *pNode,const m44 &parentTransform);
+    void ReadNodeHierarchy(r32 animationTimeInTicks, const aiNode *pNode,const m44 &parentTransform);
+    aiNodeAnim* FindNodeAnim(const aiAnimation *pAnimation, const std::string &nodeName);
+    m44 CalcInterpolatedScaling(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
+    m44 CalcInterpolatedRotation(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
+    m44 CalcInterpolatedTranslation(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
+
 public:
     u32 mNumVertices;
     m44 mModel;
@@ -79,7 +86,7 @@ public:
     bool Load(std::vector<v3> &vertices, std::vector<v3> &normals, std::vector<v2> &texCoords, std::vector<u32> &indices);
     void LoadBone(u32 globalVertexId, const aiBone *pBone);
     u32 GetBoneId(const aiBone *pBone);
-    void LoadBoneTransforms(std::vector<m44> &transforms);
+    void LoadBoneTransforms(r32 timeInSeconds, std::vector<m44> &transforms);
 
 };
 

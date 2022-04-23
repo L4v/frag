@@ -188,7 +188,7 @@ main() {
     if(!Dragon.Load(Vertices, Normals, TexCoords, Indices)) {
         std::cerr << "[err] failed to load " << Dragon.mFilepath << std::endl;
     }
-    Dragon.LoadBoneTransforms(BoneTransforms);
+    Dragon.LoadBoneTransforms(0.0f, BoneTransforms);
 
     glGenVertexArrays(1, &ModelVAO);
     glBindVertexArray(ModelVAO);
@@ -261,7 +261,7 @@ main() {
     r32 StartTimeMillis = _CurrentTimeInMillis();
     r32 EndTimeMillis = _CurrentTimeInMillis();
     r32 BeginTimeMillis = _CurrentTimeInMillis();
-    r32 RunningTimeMillis = _CurrentTimeInMillis();
+    r32 RunningTimeSec = _CurrentTimeInMillis() / 1000.0f;
     State.mDT = EndTimeMillis - StartTimeMillis;
 
     u32 OldFBO;
@@ -279,7 +279,7 @@ main() {
     while(!glfwWindowShouldClose(Window)) {
 
         StartTimeMillis = _CurrentTimeInMillis();
-        RunningTimeMillis = _CurrentTimeInMillis() - BeginTimeMillis;
+        RunningTimeSec = (_CurrentTimeInMillis() - BeginTimeMillis) / 1000.0f;
         
         glUseProgram(Phong.mId);
         if(Scene.mHasResized) {
@@ -323,7 +323,7 @@ main() {
         RiggedPhong.SetUniform1i("uDisplayBoneIdx", State.mDebugBoneIdx);
 
         // NOTE(Jovan): Render model
-        RenderModel(Dragon, RiggedPhong, RunningTimeMillis, ModelVAO, ModelBuffers.mIds[GLBuffers::INDEX_BUFFER]);
+        RenderModel(Dragon, RiggedPhong, RunningTimeSec, ModelVAO, ModelBuffers.mIds[GLBuffers::INDEX_BUFFER]);
         glUseProgram(Phong.mId);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
