@@ -1,5 +1,5 @@
 build
 spec.txt
-res/models/
+res/
 test_math3d.cpp
 .vscode
