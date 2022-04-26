@@ -161,6 +161,12 @@ struct v3 {
         X = x; Y = y; Z = z;
     }
 
+#ifdef AI_VECTOR3D_H_INC
+    v3(const aiVector3D &aiVec) {
+        X = aiVec.x; Y = aiVec.y; Z = aiVec.z;
+    }
+#endif
+
     inline r32 Magnitude() const {
         return SQRT(X*X + Y*Y + Z*Z);
     }
@@ -242,6 +248,10 @@ struct v3 {
 
 inline v3 operator* (r32 s, const v3 &a) {
     return a * s;
+}
+
+inline v3 Lerp(const v3 &a, const v3 &b, r32 t) {
+    return (1.0f - t) * a + t * b;
 }
 
 struct v4 {
@@ -380,9 +390,15 @@ struct quat {
         R = Cos; V = Sin * (axis.GetNormalized());
     }
 
+#ifdef AI_QUATERNION_H_INC
+    quat(const aiQuaternion &aiQuat) {
+        R = aiQuat.w; V = v3(aiQuat.x, aiQuat.y, aiQuat.z);
+    }
+#endif
+
     inline quat& Normalize() {
         r32 L = Magnitude();
-        
+        R /= L; V /= L;
         return *this;
     }
 
@@ -545,11 +561,13 @@ struct m44 {
         X3 = 0.0f;                                           Y3 = 0.0f;                                          Z3 = 0.0f;                                          W3 = 1.0f;
     }
 
-    void LoadIdentity() {
+    m44& LoadIdentity() {
         X0 = 1.0f; Y0 = 0.0f; Z0 = 0.0f; W0 = 0.0f;
         X1 = 0.0f; Y1 = 1.0f; Z1 = 0.0f; W1 = 0.0f;
         X2 = 0.0f; Y2 = 0.0f; Z2 = 1.0f; W2 = 0.0f;
         X3 = 0.0f; Y3 = 0.0f; Z3 = 0.0f; W3 = 1.0f;
+        
+        return *this;
     }
 
     r32 Determinant() const {
@@ -730,7 +748,7 @@ inline m44 perspective(r32 angleFOVY, r32 aspectRatio, r32 near, r32 far) {
               0.0f,             0.0f, 2.0f * far * near / (near - far),  0.0f);
 }
 
-static m44 lookAt(const v3 &eye, const v3 &center, const v3 &up) {
+global m44 lookAt(const v3 &eye, const v3 &center, const v3 &up) {
     v3 F = (center - eye).GetNormalized();
     v3 S = (F ^ up).GetNormalized();
     v3 U = S ^ F;

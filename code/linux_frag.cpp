@@ -105,7 +105,9 @@ RenderModel(Model &model, ShaderProgram &program, r32 runningTime, u32 vao, u32 
         .Rotate(quat(v3(0.0f, 0.0f, 1.0f), model.mRotation.Z))
         .Scale(model.mScale);
     program.SetUniform4m("uModel", model.mModel);
-    program.SetUniform4m("uBones", model.mBoneInfos.mFinalTransforms);
+    std::vector<m44> BoneTransforms;
+    model.LoadBoneTransforms(runningTime, BoneTransforms);
+    program.SetUniform4m("uBones", BoneTransforms);
 
     glBindVertexArray(vao);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
@@ -171,7 +173,7 @@ main() {
     ShaderProgram RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
     ShaderProgram Debug("../shaders/debug.vert", "../shaders/debug.frag");
 
-    Model Dragon("../res/boblampclean.md5mesh");
+    Model Dragon("../res/model2.gltf");
     
     Dragon.mPosition = v3(0.0f);
     Dragon.mRotation = v3(-90.0f, 0.0f, 0.0f);
@@ -183,12 +185,10 @@ main() {
     std::vector<v3> Normals;
     std::vector<u32> Indices;
     std::vector<Texture> ModelTextures;
-    std::vector<m44> BoneTransforms;
 
     if(!Dragon.Load(Vertices, Normals, TexCoords, Indices)) {
         std::cerr << "[err] failed to load " << Dragon.mFilepath << std::endl;
     }
-    Dragon.LoadBoneTransforms(0.0f, BoneTransforms);
 
     glGenVertexArrays(1, &ModelVAO);
     glBindVertexArray(ModelVAO);

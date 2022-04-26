@@ -16,8 +16,6 @@ uniform mat4 uBones[MAX_BONES];
 out vec2 TexCoord;
 out vec3 FragPos;
 out vec3 Normal;
-flat out ivec4 BoneIds;
-out vec4 BoneWeights;
 
 out vec4 vertexColor;
 
@@ -28,18 +26,8 @@ void main() {
     BoneTransform     += uBones[aBoneIds[3]] * aBoneWeights[3];
 
     vec4 LocalPos = BoneTransform * vec4(aPos, 1.0f);
-    //FragPos = vec3(uModel * vec4(aPos, 1.0));
 
-    //vec4 LocalNormal = BoneTransform * vec4(aNormal, 0.0);
-    //// TODO(Jovan): Model multiply?
-    //Normal = (uModel * LocalNormal).xyz;
-
-    //FragPos = vec3(uModel * vec4(aPos, 1.0));
-    //gl_Position = uProjection * uView * vec4(FragPos, 1.0);
-
-    gl_Position = uProjection * uView * uModel * BoneTransform * vec4(aPos, 1.0);
+    gl_Position = uProjection * uView * uModel * LocalPos;
     TexCoord = aTexCoord;
     Normal = aNormal;
-    BoneIds = aBoneIds;
-    BoneWeights = aBoneWeights;
 }

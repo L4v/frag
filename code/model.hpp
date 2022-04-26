@@ -63,9 +63,12 @@ private:
 
     void ReadNodeHierarchy(r32 animationTimeInTicks, const aiNode *pNode,const m44 &parentTransform);
     aiNodeAnim* FindNodeAnim(const aiAnimation *pAnimation, const std::string &nodeName);
-    m44 CalcInterpolatedScaling(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
-    m44 CalcInterpolatedRotation(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
-    m44 CalcInterpolatedTranslation(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
+    u32 FindScaling(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
+    u32 FindPosition(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
+    u32 FindRotation(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
+    v3 CalcInterpolatedScaling(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
+    v3 CalcInterpolatedPosition(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
+    quat CalcInterpolatedRotation(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
 
 public:
     u32 mNumVertices;

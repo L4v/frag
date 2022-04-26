@@ -1,11 +1,5 @@
 #include "model.hpp"
 
-Model::Model(const std::string &filePath) {
-    mFilepath = filePath;
-    mDirectory = mFilepath.substr(0, mFilepath.find_last_of(PATH_SEPARATOR));
-}
-
-
 void
 VertexBoneData::AddBoneData(u32 id, r32 weight) {
     for(u32 i = 0; i < ArrayCount(mWeights); ++i) {
@@ -22,6 +16,11 @@ BoneInfos::AddBoneInfo(const aiMatrix4x4 &offset) {
     mOffsets.push_back(m44(&offset[0][0]));
     mFinalTransforms.push_back(m44());
     ++mCount;
+}
+
+Model::Model(const std::string &filePath) {
+    mFilepath = filePath;
+    mDirectory = mFilepath.substr(0, mFilepath.find_last_of(PATH_SEPARATOR));
 }
 
 u32
@@ -144,26 +143,111 @@ Model::LoadBoneTransforms(r32 timeInSeconds, std::vector<m44> &transforms) {
         mScene->mAnimations[0]->mTicksPerSecond
         : 25.0f);
     r32 TimeInTicks = timeInSeconds * TicksPerSecond;
-    r32 AnimationTimeTicks = fmod(TimeInTicks, (r32)(mScene->mAnimations[0]->mDuration));
+    r32 AnimationTimeInTicks = fmod(TimeInTicks, (r32)(mScene->mAnimations[0]->mDuration));
 
-    ReadNodeHierarchy(mScene->mRootNode, Identity);
+    ReadNodeHierarchy(AnimationTimeInTicks, mScene->mRootNode, Identity);
     transforms.resize(mBoneInfos.mCount);
     for(u32 BoneInfoIdx = 0; BoneInfoIdx < mBoneInfos.mCount; ++BoneInfoIdx) {
         transforms[BoneInfoIdx] = mBoneInfos.mFinalTransforms[BoneInfoIdx];
     }
 }
 
-m44
+u32
+Model::FindScaling(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim) {
+    for(u32 ScalingIdx = 0; ScalingIdx < pNodeAnim->mNumScalingKeys - 1; ++ScalingIdx) {
+        r32 T = (r32)pNodeAnim->mScalingKeys[ScalingIdx + 1].mTime;
+        if(animationTimeInTicks < T) {
+            return ScalingIdx;
+        }
+    }
+
+    return 0;
+}
+
+u32
+Model::FindPosition(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim) {
+    for(u32 PositionIdx = 0; PositionIdx < pNodeAnim->mNumPositionKeys - 1; ++PositionIdx) {
+        r32 T = (r32)pNodeAnim->mPositionKeys[PositionIdx + 1].mTime;
+        if(animationTimeInTicks < T) {
+            return PositionIdx;
+        }
+    }
+
+    return 0;
+}
+
+u32
+Model::FindRotation(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim) {
+    for(u32 RotationIdx = 0; RotationIdx < pNodeAnim->mNumRotationKeys - 1; ++RotationIdx) {
+        r32 T = (r32)pNodeAnim->mRotationKeys[RotationIdx + 1].mTime;
+        if(animationTimeInTicks < T) {
+            return RotationIdx;
+        }
+    }
+
+    return 0;
+}
+
+v3
 Model::CalcInterpolatedScaling(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim) {
     if(pNodeAnim->mNumScalingKeys == 1) {
-        return m44(1.0f).Scale(v3(pNodeAnim->mScalingKeys[0].mValue.x, pNodeAnim->mScalingKeys[0].mValue.y, pNodeAnim->mScalingKeys[0].mValue.z));
+        return v3(pNodeAnim->mScalingKeys[0].mValue);
     }
 
     u32 ScalingIndex = FindScaling(animationTimeInTicks, pNodeAnim);
     u32 NextScalingIndex = ScalingIndex + 1;
-    r32 T1 = (r32)pNodeAnim->mScalingKeys[ScalingIndex].mTime
-    // TODO(Jovan): Continue from here 10:22 https://www.youtube.com/watch?v=gnnoPaStVzg
+    aiVectorKey StartKey = pNodeAnim->mScalingKeys[ScalingIndex];
+    aiVectorKey EndKey = pNodeAnim->mScalingKeys[NextScalingIndex];
+    r32 T1 = StartKey.mTime;
+    r32 T2 = EndKey.mTime;
+    r32 DeltaTime = T2 - T1;
+    r32 Factor = (animationTimeInTicks - T1) / DeltaTime;
+    v3 A(StartKey.mValue);
+    v3 B(EndKey.mValue);
+    return Lerp(A, B, Factor);
 }
+
+v3
+Model::CalcInterpolatedPosition(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim) {
+    if(pNodeAnim->mNumPositionKeys == 1) {
+        return v3(pNodeAnim->mPositionKeys[0].mValue);
+    }
+
+    u32 PositionIndex = FindPosition(animationTimeInTicks, pNodeAnim);
+    u32 NextPositionIndex = PositionIndex + 1;
+    aiVectorKey StartKey = pNodeAnim->mPositionKeys[PositionIndex];
+    aiVectorKey EndKey = pNodeAnim->mPositionKeys[NextPositionIndex];
+    r32 T1 = StartKey.mTime;
+    r32 T2 = EndKey.mTime;
+    r32 DeltaTime = T2 - T1;
+    r32 Factor = (animationTimeInTicks - T1) / DeltaTime;
+    v3 A(StartKey.mValue);
+    v3 B(EndKey.mValue);
+    return Lerp(A, B, Factor);
+}
+
+quat
+Model::CalcInterpolatedRotation(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim) {
+    if(pNodeAnim->mNumRotationKeys == 1) {
+        return quat(pNodeAnim->mRotationKeys[0].mValue);
+    }
+
+    u32 RotationIndex = FindRotation(animationTimeInTicks, pNodeAnim);
+    u32 NextRotationIndex = RotationIndex + 1;
+    aiQuatKey StartKey = pNodeAnim->mRotationKeys[RotationIndex];
+    aiQuatKey EndKey = pNodeAnim->mRotationKeys[NextRotationIndex];
+    r32 T1 = StartKey.mTime;
+    r32 T2 = EndKey.mTime;
+    r32 DeltaTime = T2 - T1;
+    r32 Factor = (animationTimeInTicks - T1) / DeltaTime;
+    aiQuaternion &A = StartKey.mValue;
+    aiQuaternion &B = EndKey.mValue;
+    aiQuaternion Result;
+    aiQuaternion::Interpolate(Result, A, B, Factor);
+    Result = Result.Normalize();
+    return quat(Result);
+}
+
 
 void
 Model::ReadNodeHierarchy(r32 animationTimeInTicks, const aiNode *pNode, const m44 &parentTransform) {
@@ -171,12 +255,19 @@ Model::ReadNodeHierarchy(r32 animationTimeInTicks, const aiNode *pNode, const m4
 
     const aiAnimation *pAnimation = mScene->mAnimations[0];
     m44 NodeTransform(&pNode->mTransformation[0][0]);
-    m44 GlobalTransform = parentTransform * NodeTransform;
     const aiNodeAnim *pNodeAnim = FindNodeAnim(pAnimation, Name);
 
-    if(aiNodeAnim) {
-        CalcInterpolatedScaling(animationTimeInTicks, pNodeAnim);
+    if(pNodeAnim) {
+        v3 Scaling = CalcInterpolatedScaling(animationTimeInTicks, pNodeAnim);
+        v3 Position = CalcInterpolatedPosition(animationTimeInTicks, pNodeAnim);
+        quat Rotation = CalcInterpolatedRotation(animationTimeInTicks, pNodeAnim);
+        m44 ScalingM = m44(1.0f).Scale(Scaling);
+        m44 TranslationM = m44(1.0f).Translate(Position);
+        m44 RotationM = m44(Rotation);
+        NodeTransform = RotationM;
     }
+
+    m44 GlobalTransform = parentTransform * NodeTransform;
 
     if(mBoneNameToIndex.find(Name) != mBoneNameToIndex.end()) {
         u32 BoneIndex = mBoneNameToIndex[Name];
@@ -184,7 +275,7 @@ Model::ReadNodeHierarchy(r32 animationTimeInTicks, const aiNode *pNode, const m4
     }
 
     for(u32 ChildIdx = 0; ChildIdx < pNode->mNumChildren; ++ChildIdx) {
-        ReadNodeHierarchy(pNode->mChildren[ChildIdx], GlobalTransform);
+        ReadNodeHierarchy(animationTimeInTicks, pNode->mChildren[ChildIdx], GlobalTransform);
     }
 }
 
