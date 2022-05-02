@@ -173,10 +173,10 @@ main() {
     ShaderProgram RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
     ShaderProgram Debug("../shaders/debug.vert", "../shaders/debug.frag");
 
-    Model Dragon("../res/model2.gltf");
+    Model Dragon("../res/boblampclean.md5mesh");
     
     Dragon.mPosition = v3(0.0f);
-    Dragon.mRotation = v3(-90.0f, 0.0f, 0.0f);
+    Dragon.mRotation = v3(0.0f);
     Dragon.mScale    = v3(0.08f);
 
     u32 ModelVAO;

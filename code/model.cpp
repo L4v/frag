@@ -14,7 +14,7 @@ VertexBoneData::AddBoneData(u32 id, r32 weight) {
 void
 BoneInfos::AddBoneInfo(const aiMatrix4x4 &offset) {
     mOffsets.push_back(m44(&offset[0][0]));
-    mFinalTransforms.push_back(m44());
+    mFinalTransforms.push_back(m44(1.0f));
     ++mCount;
 }
 
@@ -54,7 +54,6 @@ Model::LoadBone(u32 baseVertex, const aiBone *pBone) {
 
 bool
 Model::Load(std::vector<v3> &vertices, std::vector<v3> &normals, std::vector<v2> &texCoords, std::vector<u32> &indices) {
-    
     mScene = mImporter.ReadFile(mFilepath, POSTPROCESS_FLAGS);
     if(!mScene) {
         std::cerr << "[Err] Failed to load " << mFilepath << std::endl;
@@ -62,7 +61,6 @@ Model::Load(std::vector<v3> &vertices, std::vector<v3> &normals, std::vector<v2>
     }
 
     mBoneInfos.mGlobalInverseTransform = ~m44(&mScene->mRootNode->mTransformation[0][0]);
-
     mMeshes.resize(mScene->mNumMeshes);
 
     mNumVertices = 0;
@@ -264,7 +262,7 @@ Model::ReadNodeHierarchy(r32 animationTimeInTicks, const aiNode *pNode, const m4
         m44 ScalingM = m44(1.0f).Scale(Scaling);
         m44 TranslationM = m44(1.0f).Translate(Position);
         m44 RotationM = m44(Rotation);
-        NodeTransform = RotationM;
+        NodeTransform = NodeTransform.LoadIdentity();
     }
 
     m44 GlobalTransform = parentTransform * NodeTransform;
