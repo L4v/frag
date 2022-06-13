@@ -10,8 +10,8 @@
 #include "shader.hpp"
 #include "model.hpp"
 
-internal i32 _WindowWidth = 800;
-internal i32 _WindowHeight = 600;
+static i32 _WindowWidth = 800;
+static i32 _WindowHeight = 600;
 
 void
 _CreateFramebuffer(u32 *fbo, u32 *rbo, u32 *texture, i32 width, i32 height) {
@@ -40,19 +40,19 @@ _CreateFramebuffer(u32 *fbo, u32 *rbo, u32 *texture, i32 width, i32 height) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-internal void
+static void
 _ErrorCallback(int error, const char* description) {
     std::cerr << "[Err] GLFW: " << description << std::endl;
 }
 
-internal void
+static void
 _FramebufferSizeCallback(GLFWwindow *window, i32 width, i32 height) {
     EngineState *State = (EngineState*) glfwGetWindowUserPointer(window);
     _WindowWidth = width;
     _WindowHeight = height;
 }
 
-internal void
+static void
 _KeyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action, i32 mods) {
     EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
 
@@ -65,12 +65,12 @@ _KeyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action, i32 mods) {
     }
 }
 
-internal void
+static void
 _CursorPosCallback(GLFWwindow *window, r64 xNew, r64 yNew) {
     EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
 }
 
-internal void
+static void
 _MouseButtonCallback(GLFWwindow *window, i32 button, i32 action, i32 mods) {
     EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
     if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
@@ -81,7 +81,7 @@ _MouseButtonCallback(GLFWwindow *window, i32 button, i32 action, i32 mods) {
     }
 }
 
-internal void
+static void
 _ScrollCallback(GLFWwindow *window, r64 xoffset, r64 yoffset) {
     EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
     if(State->mSceneWindowFocused) {
@@ -89,55 +89,58 @@ _ScrollCallback(GLFWwindow *window, r64 xoffset, r64 yoffset) {
     }
 }
 
-internal inline r64
+static inline r64
 _CurrentTimeInMillis() {
     return glfwGetTime() * 1000.0;
 }
 
-void
-RenderModel(Model &model, ShaderProgram &program, r32 runningTime, u32 vao, u32 indexBuffer) {
-    model.mModel.LoadIdentity();
-    model.mModel
-        .Translate(model.mPosition)
-        // TODO(Jovan): Tidy it up with quaternions?
-        .Rotate(quat(v3(1.0f, 0.0f, 0.0f), model.mRotation.X))
-        .Rotate(quat(v3(0.0f, 1.0f, 0.0f), model.mRotation.Y))
-        .Rotate(quat(v3(0.0f, 0.0f, 1.0f), model.mRotation.Z))
-        .Scale(model.mScale);
-    program.SetUniform4m("uModel", model.mModel);
-    std::vector<m44> BoneTransforms;
-    model.LoadBoneTransforms(runningTime, BoneTransforms);
-    program.SetUniform4m("uBones", BoneTransforms);
+// void
+// RenderModel(GLTFModel &model, ShaderProgram &program, r32 runningTime, u32 vao, u32 indexBuffer) {
+//     m44 Model(1.0f);
+//     // Model
+//     //     .Translate(model.mPosition)
+//     //     // TODO(Jovan): Tidy it up with quaternions?
+//     //     .Rotate(quat(v3(1.0f, 0.0f, 0.0f), model.mRotation.X))
+//     //     .Rotate(quat(v3(0.0f, 1.0f, 0.0f), model.mRotation.Y))
+//     //     .Rotate(quat(v3(0.0f, 0.0f, 1.0f), model.mRotation.Z))
+//     //     .Scale(model.mScale);
+//     program.SetUniform4m("uModel", Model);
+//     std::vector<m44> BoneTransforms;
+//     model.CalculateJointTransforms(BoneTransforms, runningTime);
+//     // program.SetUniform4m("uBones", BoneTransforms);
+//     for(u32 i = 0; i < BoneTransforms.size(); ++i) {
+//         program.SetUniform4m("uBones[" + std::to_string(i) + "]", BoneTransforms[i]);
+//     }
 
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-    for(u32 MeshIdx = 0; MeshIdx < model.mMeshes.size(); ++MeshIdx) {
-        const Mesh &Mesh = model.mMeshes[MeshIdx];
-        const Material &Material = Mesh.mMaterial;
+//     glBindVertexArray(vao);
+//     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+//     for(u32 MeshIdx = 0; MeshIdx < model.mMeshes.size(); ++MeshIdx) {
+//         const Mesh &Mesh = model.mMeshes[MeshIdx];
+//         const Mesh::Material &Material = Mesh.mMaterial;
 
-        if(Material.mDiffuseTextureId) {
-            glActiveTexture(GL_TEXTURE0);
-            program.SetUniform1i("uDiffuse", 0);
-            glBindTexture(GL_TEXTURE_2D, Material.mDiffuseTextureId);
-        }
+//         if(Material.mDiffuseTextureId) {
+//             glActiveTexture(GL_TEXTURE0);
+//             program.SetUniform1i("uDiffuse", 0);
+//             glBindTexture(GL_TEXTURE_2D, Material.mDiffuseTextureId);
+//         }
 
-        if(Material.mSpecularTextureId) {
-            glActiveTexture(GL_TEXTURE1);
-            program.SetUniform1i("uSpecular", 1);
-            glBindTexture(GL_TEXTURE_2D, Material.mSpecularTextureId);
-        }
+//         if(Material.mSpecularTextureId) {
+//             glActiveTexture(GL_TEXTURE1);
+//             program.SetUniform1i("uSpecular", 1);
+//             glBindTexture(GL_TEXTURE_2D, Material.mSpecularTextureId);
+//         }
 
-        glDrawElementsBaseVertex(GL_TRIANGLES,
-                model.mMeshes[MeshIdx].mNumIndices,
-                GL_UNSIGNED_INT,
-                (void*)(sizeof(u32) * model.mMeshes[MeshIdx].mBaseIndex),
-                model.mMeshes[MeshIdx].mBaseVertex);
+//         glDrawElementsBaseVertex(GL_TRIANGLES,
+//                 model.mMeshes[MeshIdx].mNumIndices,
+//                 GL_UNSIGNED_INT,
+//                 (void*)(sizeof(u32) * model.mMeshes[MeshIdx].mBaseIndex),
+//                 model.mMeshes[MeshIdx].mBaseVertex);
 
-        glActiveTexture(GL_TEXTURE0);
-    }
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-}
+//         glActiveTexture(GL_TEXTURE0);
+//     }
+//     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//     glBindVertexArray(0);
+// }
 
 i32
 main() {
@@ -173,11 +176,11 @@ main() {
     ShaderProgram RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
     ShaderProgram Debug("../shaders/debug.vert", "../shaders/debug.frag");
 
-    Model Dragon("../res/model2.gltf");
+    GLTFModel Dragon("../res/backleg2rigging_baked.gltf");
     
-    Dragon.mPosition = v3(0.0f);
-    Dragon.mRotation = v3(-90.0f, 0.0f, 0.0f);
-    Dragon.mScale    = v3(0.08f);
+    // Dragon.mPosition = v3(0.0f);
+    // Dragon.mRotation = v3(-90.0f, 0.0f, 0.0f);
+    // Dragon.mScale    = v3(0.08f);
 
     u32 ModelVAO;
     std::vector<v2> TexCoords;
@@ -186,46 +189,42 @@ main() {
     std::vector<u32> Indices;
     std::vector<Texture> ModelTextures;
 
-    if(!Dragon.Load(Vertices, Normals, TexCoords, Indices)) {
-        std::cerr << "[err] failed to load " << Dragon.mFilepath << std::endl;
-    }
+    // glGenVertexArrays(1, &ModelVAO);
+    // glBindVertexArray(ModelVAO);
+    // GLBuffers ModelBuffers;
+    // ModelBuffers.BufferData(GLBuffers::POS_VB, sizeof(Vertices[0]) * Vertices.size(), &Vertices[0]);
+    // ModelBuffers.SetPointer(GLBuffers::POS_VB, GLBuffers::POSITION_LOCATION, 3, GL_FLOAT, 0, 0);
 
-    glGenVertexArrays(1, &ModelVAO);
-    glBindVertexArray(ModelVAO);
-    GLBuffers ModelBuffers;
-    ModelBuffers.BufferData(GLBuffers::POS_VB, sizeof(Vertices[0]) * Vertices.size(), &Vertices[0]);
-    ModelBuffers.SetPointer(GLBuffers::POS_VB, GLBuffers::POSITION_LOCATION, 3, GL_FLOAT, 0, 0);
+    // ModelBuffers.BufferData(GLBuffers::NORM_VB, sizeof(Normals[0]) * Normals.size(), &Normals[0]);
+    // ModelBuffers.SetPointer(GLBuffers::NORM_VB, GLBuffers::NORMAL_LOCATION, 3, GL_FLOAT, 0, 0);
 
-    ModelBuffers.BufferData(GLBuffers::NORM_VB, sizeof(Normals[0]) * Normals.size(), &Normals[0]);
-    ModelBuffers.SetPointer(GLBuffers::NORM_VB, GLBuffers::NORMAL_LOCATION, 3, GL_FLOAT, 0, 0);
+    // ModelBuffers.BufferData(GLBuffers::TEXCOORD_VB, sizeof(TexCoords[0]) * TexCoords.size(), &TexCoords[0]);
+    // ModelBuffers.SetPointer(GLBuffers::TEXCOORD_VB, GLBuffers::TEXCOORD_LOCATION, 2, GL_FLOAT, 0, 0);
 
-    ModelBuffers.BufferData(GLBuffers::TEXCOORD_VB, sizeof(TexCoords[0]) * TexCoords.size(), &TexCoords[0]);
-    ModelBuffers.SetPointer(GLBuffers::TEXCOORD_VB, GLBuffers::TEXCOORD_LOCATION, 2, GL_FLOAT, 0, 0);
+    // ModelBuffers.BufferData(GLBuffers::BONE_VB, sizeof(VertexBoneData) * Dragon.mBones.size(), &Dragon.mBones[0]);
+    // ModelBuffers.SetIPointer(GLBuffers::BONE_VB, GLBuffers::BONE_ID_LOCATION, NUM_BONES_PER_VERTEX, GL_INT, sizeof(VertexBoneData), 0);
+    // ModelBuffers.SetPointer(GLBuffers::BONE_VB, GLBuffers::BONE_WEIGHT_LOCATION, NUM_BONES_PER_VERTEX, GL_FLOAT, sizeof(VertexBoneData),
+    //        (const GLvoid*)(NUM_BONES_PER_VERTEX * sizeof(u32)));
 
-    ModelBuffers.BufferData(GLBuffers::BONE_VB, sizeof(VertexBoneData) * Dragon.mBones.size(), &Dragon.mBones[0]);
-    ModelBuffers.SetIPointer(GLBuffers::BONE_VB, GLBuffers::BONE_ID_LOCATION, NUM_BONES_PER_VERTEX, GL_INT, sizeof(VertexBoneData), 0);
-    ModelBuffers.SetPointer(GLBuffers::BONE_VB, GLBuffers::BONE_WEIGHT_LOCATION, NUM_BONES_PER_VERTEX, GL_FLOAT, sizeof(VertexBoneData),
-           (const GLvoid*)(NUM_BONES_PER_VERTEX * sizeof(u32)));
+    // ModelBuffers.BufferData(GLBuffers::INDEX_BUFFER, sizeof(Indices[0]) * Indices.size(), &Indices[0], GL_ELEMENT_ARRAY_BUFFER);
+    // glBindVertexArray(0);
 
-    ModelBuffers.BufferData(GLBuffers::INDEX_BUFFER, sizeof(Indices[0]) * Indices.size(), &Indices[0], GL_ELEMENT_ARRAY_BUFFER);
-    glBindVertexArray(0);
-
-    for(u32 MeshIdx = 0; MeshIdx < Dragon.mMeshes.size(); ++MeshIdx) {
-        Material &Mat = Dragon.mMeshes[MeshIdx].mMaterial;
-        std::vector<Texture>::const_iterator Begin = ModelTextures.begin();
-        std::vector<Texture>::const_iterator End = ModelTextures.end();
-        // TODO(Jovan): Maybe avoid lambdas?
-        auto CustomLambda = [&](const std::string &str1) { return [&](const Texture &t) { return t.mPath == str1; }; };
-        if(!Mat.mDiffusePath.empty() && std::find_if(Begin, End, CustomLambda(Mat.mDiffusePath)) == End) {
-            Texture Diffuse(Mat.mDiffusePath, Texture::DIFFUSE);
-            Mat.mDiffuseTextureId = Diffuse.mId;
-            ModelTextures.push_back(Diffuse);
-        } else if(!Mat.mSpecularPath.empty() && std::find_if(Begin, End, CustomLambda(Mat.mSpecularPath)) == End) {
-            Texture Specular(Mat.mSpecularPath, Texture::SPECULAR);
-            Mat.mSpecularTextureId = Specular.mId;
-            ModelTextures.push_back(Specular);
-        }
-    }
+    // for(u32 MeshIdx = 0; MeshIdx < Dragon.mMeshes.size(); ++MeshIdx) {
+    //     Material &Mat = Dragon.mMeshes[MeshIdx].mMaterial;
+    //     std::vector<Texture>::const_iterator Begin = ModelTextures.begin();
+    //     std::vector<Texture>::const_iterator End = ModelTextures.end();
+    //     // TODO(Jovan): Maybe avoid lambdas?
+    //     auto CustomLambda = [&](const std::string &str1) { return [&](const Texture &t) { return t.mPath == str1; }; };
+    //     if(!Mat.mDiffusePath.empty() && std::find_if(Begin, End, CustomLambda(Mat.mDiffusePath)) == End) {
+    //         Texture Diffuse(Mat.mDiffusePath, Texture::DIFFUSE);
+    //         Mat.mDiffuseTextureId = Diffuse.mId;
+    //         ModelTextures.push_back(Diffuse);
+    //     } else if(!Mat.mSpecularPath.empty() && std::find_if(Begin, End, CustomLambda(Mat.mSpecularPath)) == End) {
+    //         Texture Specular(Mat.mSpecularPath, Texture::SPECULAR);
+    //         Mat.mSpecularTextureId = Specular.mId;
+    //         ModelTextures.push_back(Specular);
+    //     }
+    // }
 
     // NOTE(Jovan): Camera init
     Camera OrbitalCamera(45.0f, 2.0f);
@@ -320,10 +319,22 @@ main() {
         RiggedPhong.SetUniform4m("uProjection", State.mProjection);
         RiggedPhong.SetUniform3f("uViewPos", State.mCamera->mPosition);
         RiggedPhong.SetUniform4m("uView", View);
-        RiggedPhong.SetUniform1i("uDisplayBoneIdx", State.mDebugBoneIdx);
+        RiggedPhong.SetUniform1i("uDisplayBoneIdx", 0);
 
         // NOTE(Jovan): Render model
-        RenderModel(Dragon, RiggedPhong, RunningTimeSec, ModelVAO, ModelBuffers.mIds[GLBuffers::INDEX_BUFFER]);
+        // RenderModel(Dragon, RiggedPhong, RunningTimeSec, ModelVAO, ModelBuffers.mIds[GLBuffers::INDEX_BUFFER]);
+
+        std::vector<m44> BoneTransforms;
+        Dragon.CalculateJointTransforms(BoneTransforms, RunningTimeSec);
+        for(u32 i = 0; i < BoneTransforms.size(); ++i) {
+            RiggedPhong.SetUniform4m("uBones[" + std::to_string(i) + "]", BoneTransforms[i]);
+        }
+
+        m44 Model = m44(1.0f).Translate(v3(0.0f, 0.0f, -8.0f));
+        RiggedPhong.SetUniform4m("uModel", Model);
+
+        Dragon.Draw(RiggedPhong);
+
         glUseProgram(Phong.mId);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -337,7 +348,7 @@ main() {
 
         Main.Render(&State, _WindowWidth, _WindowHeight);
         Scene.Render(&State);
-        ModelWindow.Render(Dragon.mFilepath, &Dragon.mPosition[0], &Dragon.mRotation[0] ,&Dragon.mScale[0], Dragon.mNumVertices);
+        // ModelWindow.Render(Dragon.mFilepath, &Dragon.mPosition[0], &Dragon.mRotation[0] ,&Dragon.mScale[0], Dragon.mNumVertices);
 
         ImGui::Begin("Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::Text("Position: %.2f, %.2f, %.2f", State.mCamera->mPosition.X, State.mCamera->mPosition.Y, State.mCamera->mPosition.Z);
