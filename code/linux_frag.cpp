@@ -90,9 +90,15 @@ _ScrollCallback(GLFWwindow *window, r64 xoffset, r64 yoffset) {
 }
 
 static inline r64
-_CurrentTimeInMillis() {
-    return glfwGetTime() * 1000.0;
+_CurrentTimeInSeconds() {
+    return glfwGetTime();
 }
+
+static inline r64
+_CurrentTimeInMillis() {
+    return _CurrentTimeInSeconds() * 1000.0;
+}
+
 
 // void
 // RenderModel(GLTFModel &model, ShaderProgram &program, r32 runningTime, u32 vao, u32 indexBuffer) {
@@ -176,11 +182,11 @@ main() {
     ShaderProgram RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
     ShaderProgram Debug("../shaders/debug.vert", "../shaders/debug.frag");
 
-    GLTFModel Dragon("../res/backleg2rigging_baked.gltf");
+    GLTFModel LoadedModel("../res/backleg2rigging_baked.gltf");
     
-    // Dragon.mPosition = v3(0.0f);
-    // Dragon.mRotation = v3(-90.0f, 0.0f, 0.0f);
-    // Dragon.mScale    = v3(0.08f);
+    v3 ModelPosition = v3(0.0f, 0.0f, -8.0f);
+    v3 ModelRotation = v3(-90.0f, 0.0f, 0.0f);
+    v3 ModelScale    = v3(0.08f);
 
     u32 ModelVAO;
     std::vector<v2> TexCoords;
@@ -189,51 +195,14 @@ main() {
     std::vector<u32> Indices;
     std::vector<Texture> ModelTextures;
 
-    // glGenVertexArrays(1, &ModelVAO);
-    // glBindVertexArray(ModelVAO);
-    // GLBuffers ModelBuffers;
-    // ModelBuffers.BufferData(GLBuffers::POS_VB, sizeof(Vertices[0]) * Vertices.size(), &Vertices[0]);
-    // ModelBuffers.SetPointer(GLBuffers::POS_VB, GLBuffers::POSITION_LOCATION, 3, GL_FLOAT, 0, 0);
-
-    // ModelBuffers.BufferData(GLBuffers::NORM_VB, sizeof(Normals[0]) * Normals.size(), &Normals[0]);
-    // ModelBuffers.SetPointer(GLBuffers::NORM_VB, GLBuffers::NORMAL_LOCATION, 3, GL_FLOAT, 0, 0);
-
-    // ModelBuffers.BufferData(GLBuffers::TEXCOORD_VB, sizeof(TexCoords[0]) * TexCoords.size(), &TexCoords[0]);
-    // ModelBuffers.SetPointer(GLBuffers::TEXCOORD_VB, GLBuffers::TEXCOORD_LOCATION, 2, GL_FLOAT, 0, 0);
-
-    // ModelBuffers.BufferData(GLBuffers::BONE_VB, sizeof(VertexBoneData) * Dragon.mBones.size(), &Dragon.mBones[0]);
-    // ModelBuffers.SetIPointer(GLBuffers::BONE_VB, GLBuffers::BONE_ID_LOCATION, NUM_BONES_PER_VERTEX, GL_INT, sizeof(VertexBoneData), 0);
-    // ModelBuffers.SetPointer(GLBuffers::BONE_VB, GLBuffers::BONE_WEIGHT_LOCATION, NUM_BONES_PER_VERTEX, GL_FLOAT, sizeof(VertexBoneData),
-    //        (const GLvoid*)(NUM_BONES_PER_VERTEX * sizeof(u32)));
-
-    // ModelBuffers.BufferData(GLBuffers::INDEX_BUFFER, sizeof(Indices[0]) * Indices.size(), &Indices[0], GL_ELEMENT_ARRAY_BUFFER);
-    // glBindVertexArray(0);
-
-    // for(u32 MeshIdx = 0; MeshIdx < Dragon.mMeshes.size(); ++MeshIdx) {
-    //     Material &Mat = Dragon.mMeshes[MeshIdx].mMaterial;
-    //     std::vector<Texture>::const_iterator Begin = ModelTextures.begin();
-    //     std::vector<Texture>::const_iterator End = ModelTextures.end();
-    //     // TODO(Jovan): Maybe avoid lambdas?
-    //     auto CustomLambda = [&](const std::string &str1) { return [&](const Texture &t) { return t.mPath == str1; }; };
-    //     if(!Mat.mDiffusePath.empty() && std::find_if(Begin, End, CustomLambda(Mat.mDiffusePath)) == End) {
-    //         Texture Diffuse(Mat.mDiffusePath, Texture::DIFFUSE);
-    //         Mat.mDiffuseTextureId = Diffuse.mId;
-    //         ModelTextures.push_back(Diffuse);
-    //     } else if(!Mat.mSpecularPath.empty() && std::find_if(Begin, End, CustomLambda(Mat.mSpecularPath)) == End) {
-    //         Texture Specular(Mat.mSpecularPath, Texture::SPECULAR);
-    //         Mat.mSpecularTextureId = Specular.mId;
-    //         ModelTextures.push_back(Specular);
-    //     }
-    // }
-
     // NOTE(Jovan): Camera init
     Camera OrbitalCamera(45.0f, 2.0f);
     EngineState State(&OrbitalCamera);
     glfwSetWindowUserPointer(Window, &State);
 
-    State.mProjection = perspective(State.mCamera->mFOV, State.mFramebufferSize.X / (r32) State.mFramebufferSize.Y, 0.1f, 100.0f);
+    State.mProjection = Perspective(State.mCamera->mFOV, State.mFramebufferSize.X / (r32) State.mFramebufferSize.Y, 0.1f, 100.0f);
     m44 View(1.0f);
-    View = lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
+    View = LookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
 
     // NOTE(Jovan): Set texture scale
     glUseProgram(Phong.mId);
@@ -260,7 +229,7 @@ main() {
     r32 StartTimeMillis = _CurrentTimeInMillis();
     r32 EndTimeMillis = _CurrentTimeInMillis();
     r32 BeginTimeMillis = _CurrentTimeInMillis();
-    r32 RunningTimeSec = _CurrentTimeInMillis() / 1000.0f;
+    r32 RunningTimeSec = _CurrentTimeInSeconds();
     State.mDT = EndTimeMillis - StartTimeMillis;
 
     u32 OldFBO;
@@ -288,7 +257,7 @@ main() {
 
             _CreateFramebuffer(&FBO, &RBO, &State.mFBOTexture, State.mFramebufferSize.X, State.mFramebufferSize.Y);
             glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-            State.mProjection = perspective(State.mCamera->mFOV, State.mFramebufferSize.X / (r32) State.mFramebufferSize.Y, 0.1f, 100.0f);
+            State.mProjection = Perspective(State.mCamera->mFOV, State.mFramebufferSize.X / (r32) State.mFramebufferSize.Y, 0.1f, 100.0f);
 
             glDeleteFramebuffers(1, &OldFBO);
             glDeleteRenderbuffers(1, &OldRBO);
@@ -300,7 +269,7 @@ main() {
         Phong.SetUniform3f("uViewPos", State.mCamera->mPosition);
 
         View.LoadIdentity();
-        View = lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
+        View = LookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
         Phong.SetUniform4m("uView", View);
 
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
@@ -309,11 +278,6 @@ main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(0, 0, State.mFramebufferSize.X, State.mFramebufferSize.Y);
 
-        // glUseProgram(Debug.mId);
-        // Debug.SetUniform4m("uProjection", State.mProjection);
-        // Debug.SetUniform3f("uViewPos", State.mCamera->mPosition);
-        // Debug.SetUniform4m("uView", View);
-        // Debug.SetUniform1i("uDisplayBoneIdx", State.mDebugBoneIdx);
 
         glUseProgram(RiggedPhong.mId);
         RiggedPhong.SetUniform4m("uProjection", State.mProjection);
@@ -322,18 +286,23 @@ main() {
         RiggedPhong.SetUniform1i("uDisplayBoneIdx", 0);
 
         // NOTE(Jovan): Render model
-        // RenderModel(Dragon, RiggedPhong, RunningTimeSec, ModelVAO, ModelBuffers.mIds[GLBuffers::INDEX_BUFFER]);
-
         std::vector<m44> BoneTransforms;
-        Dragon.CalculateJointTransforms(BoneTransforms, RunningTimeSec);
+        LoadedModel.CalculateJointTransforms(BoneTransforms, RunningTimeSec);
         for(u32 i = 0; i < BoneTransforms.size(); ++i) {
             RiggedPhong.SetUniform4m("uBones[" + std::to_string(i) + "]", BoneTransforms[i]);
         }
 
-        m44 Model = m44(1.0f).Translate(v3(0.0f, 0.0f, -8.0f));
-        RiggedPhong.SetUniform4m("uModel", Model);
 
-        Dragon.Draw(RiggedPhong);
+        m44 Model(1.0f);
+        Model
+            .Translate(ModelPosition)
+            // TODO(Jovan): Tidy it up with quaternions?
+            .Rotate(quat(v3(1.0f, 0.0f, 0.0f), ModelRotation.X))
+            .Rotate(quat(v3(0.0f, 1.0f, 0.0f), ModelRotation.Y))
+            .Rotate(quat(v3(0.0f, 0.0f, 1.0f), ModelRotation.Z))
+            .Scale(ModelScale);
+        RiggedPhong.SetUniform4m("uModel", Model);
+        LoadedModel.Render(RiggedPhong);
 
         glUseProgram(Phong.mId);
 
@@ -348,7 +317,7 @@ main() {
 
         Main.Render(&State, _WindowWidth, _WindowHeight);
         Scene.Render(&State);
-        // ModelWindow.Render(Dragon.mFilepath, &Dragon.mPosition[0], &Dragon.mRotation[0] ,&Dragon.mScale[0], Dragon.mNumVertices);
+        ModelWindow.Render(LoadedModel.mFilePath, &ModelPosition[0], &ModelRotation[0] ,&ModelScale[0], LoadedModel.mVerticesCount);
 
         ImGui::Begin("Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::Text("Position: %.2f, %.2f, %.2f", State.mCamera->mPosition.X, State.mCamera->mPosition.Y, State.mCamera->mPosition.Z);

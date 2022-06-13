@@ -332,9 +332,9 @@ GLTFModel::getLocalTransform(const tinygltf::Node &node) {
 }
 
 void
-GLTFModel::Draw(const ShaderProgram &program) {
+GLTFModel::Render(const ShaderProgram &program) {
     for(u32 i = 0; i < mMeshes.size(); ++i) {
-        mMeshes[i].Draw(program);
+        mMeshes[i].Render(program);
     }
 }
 
@@ -363,6 +363,7 @@ GLTFModel::loadMesh(tinygltf::Model *tinyModel, u32 meshIdx) {
     for(u32 i = 0, j = 0; i < Positions.size(); i += 3, j += 4) {
         Vertices.push_back(Mesh::Vertex(&Positions[i], &Normals[i], &TexCoords[i], &Joints[j], &Weights[j]));
     }
+    mVerticesCount = Vertices.size();
 
     Mesh NewMesh(Vertices, Indices);
     tinygltf::TextureInfo &TexInfo = TinyMaterial.pbrMetallicRoughness.baseColorTexture;

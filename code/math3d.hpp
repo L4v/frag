@@ -792,7 +792,7 @@ inline v4 operator* (const v4 &v, const m44 &m) {
     return v4(v[0] * m[0] + v[1] * m[1] + v[2] * m[2] + v[3] * m[3]);
 } 
 
-inline m44 perspective(r32 angleFOVY, r32 aspectRatio, r32 near, r32 far) {
+inline m44 Perspective(r32 angleFOVY, r32 aspectRatio, r32 near, r32 far) {
     r32 F = 1.0f / TAN((angleFOVY * RAD) / 2.0f);
     return m44(F / aspectRatio, 0.0f, 0.0f,                              0.0f,
               0.0f,                F, 0.0f,                              0.0f, 
@@ -800,7 +800,7 @@ inline m44 perspective(r32 angleFOVY, r32 aspectRatio, r32 near, r32 far) {
               0.0f,             0.0f, 2.0f * far * near / (near - far),  0.0f);
 }
 
-static m44 lookAt(const v3 &eye, const v3 &center, const v3 &up) {
+static m44 LookAt(const v3 &eye, const v3 &center, const v3 &up) {
     v3 F = (center - eye).GetNormalized();
     v3 S = (F ^ up).GetNormalized();
     v3 U = S ^ F;

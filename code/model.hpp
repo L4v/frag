@@ -71,7 +71,6 @@ class GLTFModel {
         m44 mInverseBindTransform;
     };
 
-    std::string mFilePath;
     std::vector<u8> mData;
     std::vector<m44> mInverseBindPoseMatrices;
     std::map<i32, i32> mNodeToJointIdx;
@@ -94,9 +93,11 @@ class GLTFModel {
     void loadAnimations(tinygltf::Model *tinyModel);
     void traverseNodes(tinygltf::Model *tinyModel, i32 nodeIdx, i32 parentIdx, const m44 &parentTransform);
 public:
+    std::string mFilePath;
     u32 mJointCount;
+    u32 mVerticesCount;
     GLTFModel(const std::string &filePath);
-    void Draw(const ShaderProgram &program);
+    void Render(const ShaderProgram &program);
     void CalculateJointTransforms(std::vector<m44> &jointTransforms, r64 timeInSeconds);
 };
 

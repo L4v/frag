@@ -25,7 +25,7 @@ public:
     Material mMaterial;
 
     Mesh(const std::vector<Vertex> &vertices, const std::vector<u32> &indices);
-    void Draw(const ShaderProgram &program);
+    void Render(const ShaderProgram &program);
 
 private:
     std::vector<Vertex> mVertices;
