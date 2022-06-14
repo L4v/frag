@@ -1,6 +1,7 @@
 #ifndef FRAG_HPP
 #define FRAG_HPP
 #include "math3d.hpp"
+#include "model.hpp"
 
 // TODO(Jovan): In separate file?
 // TODO(Jovan): Panning?
@@ -95,7 +96,9 @@ struct EngineState {
     bool      mLeftMouse;
     bool      mImGUIInitialized;
 
-    u32       mDebugBoneIdx;
+    bool      mShowBones;
+
+    GLTFModel *mCurrModel;
 
     EngineState(Camera *camera) {
         mCamera = camera;
@@ -107,6 +110,7 @@ struct EngineState {
         mSceneWindowFocused = false;
         mFirstMouse = true;
         mFramebufferSize = v2(1920, 1080);
+        mShowBones = true;
     }
 };
 #endif

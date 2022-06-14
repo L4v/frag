@@ -360,24 +360,25 @@ GLTFModel::loadMesh(tinygltf::Model *tinyModel, u32 meshIdx) {
     std::vector<u32> Joints = LoadIndices(tinyModel, JointsAccessorIdx);
     std::vector<r32> Weights = LoadFloats(tinyModel, WeightsAccessorIdx);
 
-    for(u32 i = 0, j = 0; i < Positions.size(); i += 3, j += 4) {
-        Vertices.push_back(Mesh::Vertex(&Positions[i], &Normals[i], &TexCoords[i], &Joints[j], &Weights[j]));
+    for(u32 i = 0, j = 0, k = 0; i < Positions.size(); i += 3, j += 4, k += 2) {
+        Vertices.push_back(Mesh::Vertex(&Positions[i], &Normals[i], &TexCoords[k], &Joints[j], &Weights[j]));
     }
     mVerticesCount = Vertices.size();
 
     Mesh NewMesh(Vertices, Indices);
+    
     tinygltf::TextureInfo &TexInfo = TinyMaterial.pbrMetallicRoughness.baseColorTexture;
-    tinygltf::Texture &TinyTexture = tinyModel->textures[TexInfo.index];
-    std::map<std::string, Texture>::const_iterator TexIt = mTextures.find(TinyTexture.name);
+        tinygltf::Texture &TinyTexture = tinyModel->textures[TexInfo.index];
+        std::map<std::string, Texture>::const_iterator TexIt = mTextures.find(TinyTexture.name);
 
-    if(TexIt == mTextures.end()) {
-        tinygltf::Image &TinyImage = tinyModel->images[TinyTexture.source];
-        Texture Tex(TinyImage.width, TinyImage.height, TinyImage.image.data());
-        mTextures[TinyTexture.name] = Tex;
-        NewMesh.mMaterial.mDiffuseId = Tex.mId;
-    } else {
-        NewMesh.mMaterial.mDiffuseId = TexIt->second.mId;
-    }
+        if(TexIt == mTextures.end()) {
+            tinygltf::Image &TinyImage = tinyModel->images[TinyTexture.source];
+            Texture Tex(TinyImage.width, TinyImage.height, TinyImage.image.data());
+            mTextures[TinyTexture.name] = Tex;
+            NewMesh.mMaterial.mDiffuseId = Tex.mId;
+        } else {
+            NewMesh.mMaterial.mDiffuseId = TexIt->second.mId;
+        }
 
     mMeshes.push_back(NewMesh);
 }

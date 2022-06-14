@@ -57,7 +57,7 @@ _KeyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action, i32 mods) {
     EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
 
     if(key == GLFW_KEY_SPACE && action == GLFW_RELEASE) {
-        State->mDebugBoneIdx = (State->mDebugBoneIdx + 1) % 34;
+        State->mShowBones = !State->mShowBones;
     }
 
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -99,55 +99,6 @@ _CurrentTimeInMillis() {
     return _CurrentTimeInSeconds() * 1000.0;
 }
 
-
-// void
-// RenderModel(GLTFModel &model, ShaderProgram &program, r32 runningTime, u32 vao, u32 indexBuffer) {
-//     m44 Model(1.0f);
-//     // Model
-//     //     .Translate(model.mPosition)
-//     //     // TODO(Jovan): Tidy it up with quaternions?
-//     //     .Rotate(quat(v3(1.0f, 0.0f, 0.0f), model.mRotation.X))
-//     //     .Rotate(quat(v3(0.0f, 1.0f, 0.0f), model.mRotation.Y))
-//     //     .Rotate(quat(v3(0.0f, 0.0f, 1.0f), model.mRotation.Z))
-//     //     .Scale(model.mScale);
-//     program.SetUniform4m("uModel", Model);
-//     std::vector<m44> BoneTransforms;
-//     model.CalculateJointTransforms(BoneTransforms, runningTime);
-//     // program.SetUniform4m("uBones", BoneTransforms);
-//     for(u32 i = 0; i < BoneTransforms.size(); ++i) {
-//         program.SetUniform4m("uBones[" + std::to_string(i) + "]", BoneTransforms[i]);
-//     }
-
-//     glBindVertexArray(vao);
-//     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-//     for(u32 MeshIdx = 0; MeshIdx < model.mMeshes.size(); ++MeshIdx) {
-//         const Mesh &Mesh = model.mMeshes[MeshIdx];
-//         const Mesh::Material &Material = Mesh.mMaterial;
-
-//         if(Material.mDiffuseTextureId) {
-//             glActiveTexture(GL_TEXTURE0);
-//             program.SetUniform1i("uDiffuse", 0);
-//             glBindTexture(GL_TEXTURE_2D, Material.mDiffuseTextureId);
-//         }
-
-//         if(Material.mSpecularTextureId) {
-//             glActiveTexture(GL_TEXTURE1);
-//             program.SetUniform1i("uSpecular", 1);
-//             glBindTexture(GL_TEXTURE_2D, Material.mSpecularTextureId);
-//         }
-
-//         glDrawElementsBaseVertex(GL_TRIANGLES,
-//                 model.mMeshes[MeshIdx].mNumIndices,
-//                 GL_UNSIGNED_INT,
-//                 (void*)(sizeof(u32) * model.mMeshes[MeshIdx].mBaseIndex),
-//                 model.mMeshes[MeshIdx].mBaseVertex);
-
-//         glActiveTexture(GL_TEXTURE0);
-//     }
-//     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-//     glBindVertexArray(0);
-// }
-
 i32
 main() {
 
@@ -182,11 +133,12 @@ main() {
     ShaderProgram RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
     ShaderProgram Debug("../shaders/debug.vert", "../shaders/debug.frag");
 
-    GLTFModel LoadedModel("../res/backleg2rigging_baked.gltf");
+    GLTFModel BonesModel("../res/backleg_bones.gltf");
+    GLTFModel MusclesModel("../res/backleg_muscles.glb");
     
-    v3 ModelPosition = v3(0.0f, 0.0f, -8.0f);
-    v3 ModelRotation = v3(-90.0f, 0.0f, 0.0f);
-    v3 ModelScale    = v3(0.08f);
+    v3 ModelPosition = v3(0.0f, 4.0f, -8.0f);
+    v3 ModelRotation = v3(0.0f, 0.0f, 0.0f);
+    v3 ModelScale    = v3(1.0f);
 
     u32 ModelVAO;
     std::vector<v2> TexCoords;
@@ -246,6 +198,12 @@ main() {
     glEnable(GL_TEXTURE_2D);
     while(!glfwWindowShouldClose(Window)) {
 
+        if(State.mShowBones) {
+            State.mCurrModel = &BonesModel;
+        } else {
+            State.mCurrModel = &MusclesModel;
+        }
+
         StartTimeMillis = _CurrentTimeInMillis();
         RunningTimeSec = (_CurrentTimeInMillis() - BeginTimeMillis) / 1000.0f;
         
@@ -287,7 +245,7 @@ main() {
 
         // NOTE(Jovan): Render model
         std::vector<m44> BoneTransforms;
-        LoadedModel.CalculateJointTransforms(BoneTransforms, RunningTimeSec);
+        State.mCurrModel->CalculateJointTransforms(BoneTransforms, RunningTimeSec);
         for(u32 i = 0; i < BoneTransforms.size(); ++i) {
             RiggedPhong.SetUniform4m("uBones[" + std::to_string(i) + "]", BoneTransforms[i]);
         }
@@ -302,7 +260,7 @@ main() {
             .Rotate(quat(v3(0.0f, 0.0f, 1.0f), ModelRotation.Z))
             .Scale(ModelScale);
         RiggedPhong.SetUniform4m("uModel", Model);
-        LoadedModel.Render(RiggedPhong);
+        State.mCurrModel->Render(RiggedPhong);
 
         glUseProgram(Phong.mId);
 
@@ -317,7 +275,7 @@ main() {
 
         Main.Render(&State, _WindowWidth, _WindowHeight);
         Scene.Render(&State);
-        ModelWindow.Render(LoadedModel.mFilePath, &ModelPosition[0], &ModelRotation[0] ,&ModelScale[0], LoadedModel.mVerticesCount);
+        ModelWindow.Render(State.mCurrModel->mFilePath, &ModelPosition[0], &ModelRotation[0] ,&ModelScale[0], State.mCurrModel->mVerticesCount);
 
         ImGui::Begin("Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::Text("Position: %.2f, %.2f, %.2f", State.mCamera->mPosition.X, State.mCamera->mPosition.Y, State.mCamera->mPosition.Z);
