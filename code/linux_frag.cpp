@@ -198,11 +198,9 @@ main() {
     glEnable(GL_TEXTURE_2D);
     while(!glfwWindowShouldClose(Window)) {
 
-        if(State.mShowBones) {
-            State.mCurrModel = &BonesModel;
-        } else {
-            State.mCurrModel = &MusclesModel;
-        }
+        State.mCurrModel = State.mShowBones
+            ? &BonesModel
+            : &MusclesModel;
 
         StartTimeMillis = _CurrentTimeInMillis();
         RunningTimeSec = (_CurrentTimeInMillis() - BeginTimeMillis) / 1000.0f;

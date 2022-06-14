@@ -9,8 +9,8 @@ class Mesh {
 public:
     struct Vertex {
         v3 mPosition;
-        v3 mNormal;
         v2 mTexCoords;
+        v3 mNormal;
         u32 mJointIds[4];
         v4 mWeights;
 

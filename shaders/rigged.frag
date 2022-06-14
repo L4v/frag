@@ -93,5 +93,6 @@ CalculatePointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
     vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(uDiffuse, ScaledTexCoord));
     vec3 vSpecular = light.Specular * Specular * vec3(texture(uSpecular, ScaledTexCoord));
 
-    return ((vAmbient + vDiffuse + vSpecular) * Attenuation);
+    // TODO(Jovan): Specular ignored
+    return ((vAmbient + vDiffuse) * Attenuation);
 }
