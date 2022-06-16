@@ -7,6 +7,7 @@
 #define COS(x) std::cos(x)
 #define SQRT(x) std::sqrt(x)
 #define TAN(x) tanf(x)
+#define ACOS(x) std::acos(x)
 #else
 #include <math.h>
 #define SIN(x) sin(x)
@@ -21,6 +22,11 @@ const r32 PI = 3.14159265358979323846f;
 const r32 PI_HALF = PI / 2.0f;
 const r32 RAD = PI / 180.0f;
 const r32 DEG = 180.0f / PI;
+
+inline r32
+Lerp(r32 a, r32 b, r32 t) {
+    return a + (b - a) * t;
+}
 
 struct v2 {
     union {
@@ -154,6 +160,10 @@ struct v3 {
     }
 
     v3(r32 *x) {
+        X = x[0]; Y = x[1]; Z = x[2];
+    }
+
+    v3(const r64 *x) {
         X = x[0]; Y = x[1]; Z = x[2];
     }
 
@@ -354,9 +364,15 @@ inline v4 operator* (r32 s, const v4 &a) {
     return a * s;
 }
 
+/* TODO|NOTE(Jovan):
+ * Inconsistency between the order in which values are stored: [x y z w]
+ * and the order in which values are expected when calling the constructor:
+ * [w x y z]. This is because GLTF stores the values as the former and this
+ * avoids "messy" loading. Should make this consistent.
+*/
 struct quat {
-    r32 R;
     v3 V;
+    r32 R;
 
     quat() {
        R = 1.0f; V = v3(0.0f);
@@ -378,6 +394,7 @@ struct quat {
         R = r; V[0] = i; V[1] = j; V[2] = k;
     }
 
+    // TODO(Jovan): Fix inconsistency
     quat(const r32 *x) {
         R = x[0]; V = v3(&x[1]);
     }
@@ -488,6 +505,33 @@ inline quat operator* (r32 s, const quat &q) {
     return q * s;
 }
 
+/* TODO|NOTE(Jovan):
+ *  Implemented by following GLM implementation.
+ *  Implement with understanding.
+*/
+inline quat Slerp(const quat &q1, const quat &q2, r32 t) {
+    quat Tmp = q2;
+    r32 CosTheta = q1 * q2;
+
+    if(CosTheta < 0.0f) {
+        Tmp = -1 * q2;
+        CosTheta = -CosTheta;
+    }
+
+    r32 Epsilon = 1e-4;
+    if(CosTheta > 1 - Epsilon) {
+        return quat(
+            Lerp(q1.R, Tmp.R, t),
+            Lerp(q1.V.X, Tmp.V.X, t),
+            Lerp(q1.V.Y, Tmp.V.Y, t),
+            Lerp(q1.V.Z, Tmp.V.Z, t)
+        );
+    } else {
+        r32 Angle = ACOS(CosTheta);
+        return (sin((1.0f - t) * Angle) * q1 + SIN(t + Angle) * Tmp) / SIN(Angle);
+    }
+}
+
 // NOTE(Jovan): Row major
 struct m44 {
     union {
@@ -525,6 +569,14 @@ struct m44 {
     }
 
     m44(const r32 *x) {
+        for(u8 i = 0; i < 4; ++i) {
+            for(u8 j = 0; j < 4; ++j) {
+                Values[i][j] = x[i * 4 + j];
+            }
+        }
+    }
+
+    m44(const r64 *x) {
         for(u8 i = 0; i < 4; ++i) {
             for(u8 j = 0; j < 4; ++j) {
                 Values[i][j] = x[i * 4 + j];
@@ -740,7 +792,7 @@ inline v4 operator* (const v4 &v, const m44 &m) {
     return v4(v[0] * m[0] + v[1] * m[1] + v[2] * m[2] + v[3] * m[3]);
 } 
 
-inline m44 perspective(r32 angleFOVY, r32 aspectRatio, r32 near, r32 far) {
+inline m44 Perspective(r32 angleFOVY, r32 aspectRatio, r32 near, r32 far) {
     r32 F = 1.0f / TAN((angleFOVY * RAD) / 2.0f);
     return m44(F / aspectRatio, 0.0f, 0.0f,                              0.0f,
               0.0f,                F, 0.0f,                              0.0f, 
@@ -748,7 +800,7 @@ inline m44 perspective(r32 angleFOVY, r32 aspectRatio, r32 near, r32 far) {
               0.0f,             0.0f, 2.0f * far * near / (near - far),  0.0f);
 }
 
-global m44 lookAt(const v3 &eye, const v3 &center, const v3 &up) {
+static m44 LookAt(const v3 &eye, const v3 &center, const v3 &up) {
     v3 F = (center - eye).GetNormalized();
     v3 S = (F ^ up).GetNormalized();
     v3 U = S ^ F;

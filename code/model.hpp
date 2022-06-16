@@ -1,97 +1,100 @@
-#ifndef MESH_H
+#ifndef MODEL_HPP
+#define MODEL_HPP
 
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-#include <vector>
-#include <map>
+#include "include/tiny_gltf.h"
+#include "mesh.hpp"
+#include "shader.hpp"
 #include <iostream>
-#include <cmath>
+#include <string>
 
-#include "types.hpp"
-#include "include/glad/glad.h"
+class GLTFModel {
+    class Texture {
+        r32 mWidth;
+        r32 mHeight;
 
-#include "math3d.hpp"
-#include "util.hpp"
+    public:
+        u32 mId;
+        Texture();
+        Texture(r32 width, r32 height, const u8 *data);
+    };
 
-#define POSTPROCESS_FLAGS (aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals | aiProcess_JoinIdenticalVertices)
-#define INVALID_MATERIAL 0xFFFFFFFF
+    template<typename T> class Keyframes {
+    private:
+        u8 mElementCount;
 
-global const u32 NUM_BONES_PER_VERTEX = 4;
+        r32 calculateInterpolationFactor(T &start, T &end, r64 timeInSeconds);
+    public:
+        Keyframes<T>();
+        u32 mCount;
+        std::vector<r32> mTimes;
+        std::vector<T> mValues;
 
-struct Material {
-    u32 mDiffuseTextureId;
-    u32 mSpecularTextureId;
-    std::string mDiffusePath;
-    std::string mSpecularPath;
+        void Load(const r32 *timesData, const r32 *valuesData);
+        T Interpolate(r64 timeInSeconds);
+    };
 
-    // NOTE(Jovan): Doesn't work without it, even though std::string constructor
-    // should be implicitly called
-    Material() {
-        mDiffusePath = "";
-        mSpecularPath = "";
-    }
-};
+    struct AnimKeyframes {
+        Keyframes<v3> mTranslation;
+        Keyframes<quat> mRotation;
+        Keyframes<v3> mScale;
 
-struct Mesh {
-    u32 mBaseVertex;
-    u32 mBaseIndex;
-    u32 mNumIndices;
-    Material mMaterial;
-};
+        void Load(const std::string &path, u32 count, const r32 *timesData, const r32 *valuesData);
+    };
 
-struct VertexBoneData {
-    u32 mIds[NUM_BONES_PER_VERTEX] = {0};
-    r32 mWeights[NUM_BONES_PER_VERTEX] = {0.0f};
-    void AddBoneData(u32 id, r32 weight);
-};
+    struct Animation {
+        i32 mIdx;
+        r64 mDurationInSeconds;
+        std::map<i32, std::vector<i32>> mNodeToChannel;
+        std::map<i32, AnimKeyframes> mJointKeyframes;
 
-struct BoneInfos {
-    std::vector<m44> mOffsets;
-    std::vector<m44> mFinalTransforms;
-    m44              mGlobalInverseTransform;
-    u32              mCount = 0;
+        Animation(i32 idx);
+    };
 
-    void AddBoneInfo(const aiMatrix4x4 &offset);
-};
+    struct Node {
+        i32 mIdx;
+        i32 mParentIdx;
+        std::string mName;
+        std::vector<i32> mChildren;
+        m44 mLocalTransform;
+        m44 mGlobalTransform;
+    };
 
-class Model {
-private:
-    Assimp::Importer mImporter;
-    const aiScene *mScene;
-    u32 mNumIndices;
+    struct Joint {
+        i32 mIdx;
+        i32 mParentIdx;
+        std::string mName;
+        m44 mLocalTransform;
+        m44 mInverseBindTransform;
+    };
 
-    void ReadNodeHierarchy(r32 animationTimeInTicks, const aiNode *pNode,const m44 &parentTransform);
-    aiNodeAnim* FindNodeAnim(const aiAnimation *pAnimation, const std::string &nodeName);
-    u32 FindScaling(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
-    u32 FindPosition(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
-    u32 FindRotation(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
-    v3 CalcInterpolatedScaling(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
-    v3 CalcInterpolatedPosition(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
-    quat CalcInterpolatedRotation(r32 animationTimeInTicks, const aiNodeAnim *pNodeAnim);
-
-public:
-    u32 mNumVertices;
-    m44 mModel;
-    v3 mPosition;
-    // TODO(Jovan): Quaternion representation?
-    v3 mRotation;
-    v3 mScale;
-    std::string mFilepath;
-    std::string mDirectory;
+    std::vector<u8> mData;
+    std::vector<m44> mInverseBindPoseMatrices;
+    std::map<i32, i32> mNodeToJointIdx;
+    std::map<i32, i32> mNodeToNodeIdx;
+    m44 mInverseGlobalTransform;
+    std::vector<Animation> mAnimations;
+    std::vector<Joint> mJoints;
     std::vector<Mesh> mMeshes;
-    std::map<std::string, u32> mBoneNameToIndex;
-    std::vector<VertexBoneData> mBones;
-    BoneInfos mBoneInfos;
+    std::vector<Node> mNodes;
+    i32 mActiveAnimation;
+    std::map<std::string, Texture> mTextures;
 
-
-    Model(const std::string &filePath);
-    bool Load(std::vector<v3> &vertices, std::vector<v3> &normals, std::vector<v2> &texCoords, std::vector<u32> &indices);
-    void LoadBone(u32 globalVertexId, const aiBone *pBone);
-    u32 GetBoneId(const aiBone *pBone);
-    void LoadBoneTransforms(r32 timeInSeconds, std::vector<m44> &transforms);
-
+    std::vector<r32> LoadFloats(tinygltf::Model *tinyModel, i32 accessorIdx);
+    std::vector<u32> LoadIndices(tinygltf::Model *tinyModel, i32 accessorIdx);
+    m44 getLocalTransform(const tinygltf::Node &node);
+    void loadModel(tinygltf::Model *tinyModel, const std::string &filePath);
+    void loadNodes(tinygltf::Model *tinyModel);
+    void loadMesh(tinygltf::Model *tinyModel, u32 meshIdx);
+    void loadJointsFromNodes(tinygltf::Model *tinyModel, const tinygltf::Skin &skin);
+    void loadAnimations(tinygltf::Model *tinyModel);
+    void traverseNodes(tinygltf::Model *tinyModel, i32 nodeIdx, i32 parentIdx, const m44 &parentTransform);
+public:
+    std::string mFilePath;
+    u32 mJointCount;
+    u32 mVerticesCount;
+    GLTFModel(const std::string &filePath);
+    void Render(const ShaderProgram &program);
+    void CalculateJointTransforms(std::vector<m44> &jointTransforms, r64 timeInSeconds);
 };
 
-#define MESH_HP
 #endif

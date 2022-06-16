@@ -2,6 +2,8 @@
 
 #define POINT_LIGHT_COUNT 1
 
+out vec4 FragColor;
+
 struct DirLight {
     vec3 Direction;
     
@@ -22,13 +24,9 @@ struct PointLight {
     vec3 Specular;
 };
 
-out vec4 FragColor;
-
 in vec3 FragPos;
 in vec2 TexCoord;
 in vec3 Normal;
-flat in ivec4 BoneIds;
-in vec4 BoneWeights;
 
 uniform vec3       uViewPos;
 uniform DirLight   uDirLight;
@@ -36,7 +34,6 @@ uniform PointLight uPointLights[POINT_LIGHT_COUNT];
 uniform float      uTexScale;
 uniform sampler2D  uDiffuse;
 uniform sampler2D  uSpecular;
-uniform int uDisplayBoneIdx;
 
 vec2 ScaledTexCoord;
 
@@ -61,6 +58,7 @@ void main() {
     }
 
     FragColor = vec4(Result, 1.0);
+    //FragColor = vec4(1.0);
 }
 
 vec3
@@ -93,6 +91,5 @@ CalculatePointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
     vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(uDiffuse, ScaledTexCoord));
     vec3 vSpecular = light.Specular * Specular * vec3(texture(uSpecular, ScaledTexCoord));
 
-    // TODO(Jovan): Specular ignored
-    return ((vAmbient + vDiffuse) * Attenuation);
+    return ((vAmbient + vDiffuse + vSpecular) * Attenuation);
 }

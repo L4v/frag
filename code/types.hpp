@@ -2,9 +2,6 @@
 #define TYPES_HPP
 #include <cstdint>
 
-#define global static
-#define internal static
-
 typedef int8_t i8;
 typedef int16_t i16;
 typedef int32_t i32;

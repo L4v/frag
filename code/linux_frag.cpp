@@ -9,9 +9,7 @@
 #include "ui.hpp"
 #include "shader.hpp"
 #include "model.hpp"
-
-internal i32 _WindowWidth = 800;
-internal i32 _WindowHeight = 600;
+#include "util.hpp"
 
 void
 _CreateFramebuffer(u32 *fbo, u32 *rbo, u32 *texture, i32 width, i32 height) {
@@ -40,107 +38,78 @@ _CreateFramebuffer(u32 *fbo, u32 *rbo, u32 *texture, i32 width, i32 height) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-internal void
+static void
 _ErrorCallback(int error, const char* description) {
     std::cerr << "[Err] GLFW: " << description << std::endl;
 }
 
-internal void
+static void
 _FramebufferSizeCallback(GLFWwindow *window, i32 width, i32 height) {
-    EngineState *State = (EngineState*) glfwGetWindowUserPointer(window);
-    _WindowWidth = width;
-    _WindowHeight = height;
+    State *CurrState = (State*)glfwGetWindowUserPointer(window);
+    CurrState->mWindow->mSize = v2(width, height);
 }
 
-internal void
+static void
 _KeyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action, i32 mods) {
-    EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
+    State *CurrState = (State*)glfwGetWindowUserPointer(window);
+    KeyboardController *KC = &CurrState->mInput->mKeyboard;
+
+    if(action == GLFW_PRESS || action == GLFW_RELEASE) {
+        bool IsDown = action == GLFW_PRESS;
+        switch(key) {
+            case GLFW_KEY_SPACE: {
+                KC->mChangeModel = IsDown;
+            } break;
+            
+            case GLFW_KEY_ESCAPE: {
+                KC->mQuit = IsDown;
+                glfwSetWindowShouldClose(window, GLFW_TRUE);
+            } break;
+        }
+    }
 
     if(key == GLFW_KEY_SPACE && action == GLFW_RELEASE) {
-        State->mDebugBoneIdx = (State->mDebugBoneIdx + 1) % 34;
-    }
-
-    if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
+        CurrState->mShowBones = !CurrState->mShowBones;
     }
 }
 
-internal void
+static void
 _CursorPosCallback(GLFWwindow *window, r64 xNew, r64 yNew) {
-    EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
+    State *CurrState = (State*)glfwGetWindowUserPointer(window);
 }
 
-internal void
+static void
 _MouseButtonCallback(GLFWwindow *window, i32 button, i32 action, i32 mods) {
-    EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
+    State *CurrState = (State*)glfwGetWindowUserPointer(window);
     if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-        State->mLeftMouse = true;
+        CurrState->mLeftMouse = true;
     }
     if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
-        State->mLeftMouse = false;
+        CurrState->mLeftMouse = false;
     }
 }
 
-internal void
+static void
 _ScrollCallback(GLFWwindow *window, r64 xoffset, r64 yoffset) {
-    EngineState *State = (EngineState*)glfwGetWindowUserPointer(window);
-    if(State->mSceneWindowFocused) {
-        State->mCamera->Zoom(yoffset, State->mDT);
+    State *CurrState = (State*)glfwGetWindowUserPointer(window);
+    if(CurrState->mWindow->mSceneWindowFocused) {
+        CurrState->mCamera->Zoom(yoffset, CurrState->mDT);
     }
 }
 
-internal inline r64
+static inline r64
+_CurrentTimeInSeconds() {
+    return glfwGetTime();
+}
+
+static inline r64
 _CurrentTimeInMillis() {
-    return glfwGetTime() * 1000.0;
-}
-
-void
-RenderModel(Model &model, ShaderProgram &program, r32 runningTime, u32 vao, u32 indexBuffer) {
-    model.mModel.LoadIdentity();
-    model.mModel
-        .Translate(model.mPosition)
-        // TODO(Jovan): Tidy it up with quaternions?
-        .Rotate(quat(v3(1.0f, 0.0f, 0.0f), model.mRotation.X))
-        .Rotate(quat(v3(0.0f, 1.0f, 0.0f), model.mRotation.Y))
-        .Rotate(quat(v3(0.0f, 0.0f, 1.0f), model.mRotation.Z))
-        .Scale(model.mScale);
-    program.SetUniform4m("uModel", model.mModel);
-    std::vector<m44> BoneTransforms;
-    model.LoadBoneTransforms(runningTime, BoneTransforms);
-    program.SetUniform4m("uBones", BoneTransforms);
-
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-    for(u32 MeshIdx = 0; MeshIdx < model.mMeshes.size(); ++MeshIdx) {
-        const Mesh &Mesh = model.mMeshes[MeshIdx];
-        const Material &Material = Mesh.mMaterial;
-
-        if(Material.mDiffuseTextureId) {
-            glActiveTexture(GL_TEXTURE0);
-            program.SetUniform1i("uDiffuse", 0);
-            glBindTexture(GL_TEXTURE_2D, Material.mDiffuseTextureId);
-        }
-
-        if(Material.mSpecularTextureId) {
-            glActiveTexture(GL_TEXTURE1);
-            program.SetUniform1i("uSpecular", 1);
-            glBindTexture(GL_TEXTURE_2D, Material.mSpecularTextureId);
-        }
-
-        glDrawElementsBaseVertex(GL_TRIANGLES,
-                model.mMeshes[MeshIdx].mNumIndices,
-                GL_UNSIGNED_INT,
-                (void*)(sizeof(u32) * model.mMeshes[MeshIdx].mBaseIndex),
-                model.mMeshes[MeshIdx].mBaseVertex);
-
-        glActiveTexture(GL_TEXTURE0);
-    }
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    return _CurrentTimeInSeconds() * 1000.0;
 }
 
 i32
 main() {
+    Window FragWindow(800, 600);
 
     if(!glfwInit()) {
         std::cerr << "Failed to init GLFW" << std::endl;
@@ -150,34 +119,35 @@ main() {
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    GLFWwindow *Window = glfwCreateWindow(_WindowWidth, _WindowHeight, "Frag!", 0, 0);
-    if(!Window) {
+    GLFWwindow *GLFWWindow = glfwCreateWindow(FragWindow.mSize.X, FragWindow.mSize.Y, "Frag!", 0, 0);
+    if(!GLFWWindow) {
         std::cerr << "[Err] GLFW: Failed creating window" << std::endl;
         glfwTerminate();
         return -1;
     }
-    glfwSetFramebufferSizeCallback(Window, _FramebufferSizeCallback);
-    glfwSetKeyCallback(Window, _KeyCallback);
-    glfwSetMouseButtonCallback(Window, _MouseButtonCallback);
-    glfwSetCursorPosCallback(Window, _CursorPosCallback);
-    glfwSetScrollCallback(Window, _ScrollCallback);
+    glfwSetFramebufferSizeCallback(GLFWWindow, _FramebufferSizeCallback);
+    glfwSetKeyCallback(GLFWWindow, _KeyCallback);
+    glfwSetMouseButtonCallback(GLFWWindow, _MouseButtonCallback);
+    glfwSetCursorPosCallback(GLFWWindow, _CursorPosCallback);
+    glfwSetScrollCallback(GLFWWindow, _ScrollCallback);
 
-    glfwMakeContextCurrent(Window);
+    glfwMakeContextCurrent(GLFWWindow);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
     glfwSwapInterval(1);
 
     // NOTE(Jovan): Init imgui
-    InitUI(Window);
+    InitUI(GLFWWindow);
 
     ShaderProgram Phong("../shaders/basic.vert", "../shaders/basic.frag");
     ShaderProgram RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
     ShaderProgram Debug("../shaders/debug.vert", "../shaders/debug.frag");
 
-    Model Dragon("../res/boblampclean.md5mesh");
+    GLTFModel BonesModel("../res/backleg_bones.gltf");
+    GLTFModel MusclesModel("../res/backleg_muscles.glb");
     
-    Dragon.mPosition = v3(0.0f);
-    Dragon.mRotation = v3(0.0f);
-    Dragon.mScale    = v3(0.08f);
+    v3 ModelPosition = v3(0.0f, 4.0f, -8.0f);
+    v3 ModelRotation = v3(0.0f, 0.0f, 0.0f);
+    v3 ModelScale    = v3(1.0f);
 
     u32 ModelVAO;
     std::vector<v2> TexCoords;
@@ -186,55 +156,15 @@ main() {
     std::vector<u32> Indices;
     std::vector<Texture> ModelTextures;
 
-    if(!Dragon.Load(Vertices, Normals, TexCoords, Indices)) {
-        std::cerr << "[err] failed to load " << Dragon.mFilepath << std::endl;
-    }
-
-    glGenVertexArrays(1, &ModelVAO);
-    glBindVertexArray(ModelVAO);
-    GLBuffers ModelBuffers;
-    ModelBuffers.BufferData(GLBuffers::POS_VB, sizeof(Vertices[0]) * Vertices.size(), &Vertices[0]);
-    ModelBuffers.SetPointer(GLBuffers::POS_VB, GLBuffers::POSITION_LOCATION, 3, GL_FLOAT, 0, 0);
-
-    ModelBuffers.BufferData(GLBuffers::NORM_VB, sizeof(Normals[0]) * Normals.size(), &Normals[0]);
-    ModelBuffers.SetPointer(GLBuffers::NORM_VB, GLBuffers::NORMAL_LOCATION, 3, GL_FLOAT, 0, 0);
-
-    ModelBuffers.BufferData(GLBuffers::TEXCOORD_VB, sizeof(TexCoords[0]) * TexCoords.size(), &TexCoords[0]);
-    ModelBuffers.SetPointer(GLBuffers::TEXCOORD_VB, GLBuffers::TEXCOORD_LOCATION, 2, GL_FLOAT, 0, 0);
-
-    ModelBuffers.BufferData(GLBuffers::BONE_VB, sizeof(VertexBoneData) * Dragon.mBones.size(), &Dragon.mBones[0]);
-    ModelBuffers.SetIPointer(GLBuffers::BONE_VB, GLBuffers::BONE_ID_LOCATION, NUM_BONES_PER_VERTEX, GL_INT, sizeof(VertexBoneData), 0);
-    ModelBuffers.SetPointer(GLBuffers::BONE_VB, GLBuffers::BONE_WEIGHT_LOCATION, NUM_BONES_PER_VERTEX, GL_FLOAT, sizeof(VertexBoneData),
-           (const GLvoid*)(NUM_BONES_PER_VERTEX * sizeof(u32)));
-
-    ModelBuffers.BufferData(GLBuffers::INDEX_BUFFER, sizeof(Indices[0]) * Indices.size(), &Indices[0], GL_ELEMENT_ARRAY_BUFFER);
-    glBindVertexArray(0);
-
-    for(u32 MeshIdx = 0; MeshIdx < Dragon.mMeshes.size(); ++MeshIdx) {
-        Material &Mat = Dragon.mMeshes[MeshIdx].mMaterial;
-        std::vector<Texture>::const_iterator Begin = ModelTextures.begin();
-        std::vector<Texture>::const_iterator End = ModelTextures.end();
-        // TODO(Jovan): Maybe avoid lambdas?
-        auto CustomLambda = [&](const std::string &str1) { return [&](const Texture &t) { return t.mPath == str1; }; };
-        if(!Mat.mDiffusePath.empty() && std::find_if(Begin, End, CustomLambda(Mat.mDiffusePath)) == End) {
-            Texture Diffuse(Mat.mDiffusePath, Texture::DIFFUSE);
-            Mat.mDiffuseTextureId = Diffuse.mId;
-            ModelTextures.push_back(Diffuse);
-        } else if(!Mat.mSpecularPath.empty() && std::find_if(Begin, End, CustomLambda(Mat.mSpecularPath)) == End) {
-            Texture Specular(Mat.mSpecularPath, Texture::SPECULAR);
-            Mat.mSpecularTextureId = Specular.mId;
-            ModelTextures.push_back(Specular);
-        }
-    }
-
     // NOTE(Jovan): Camera init
     Camera OrbitalCamera(45.0f, 2.0f);
-    EngineState State(&OrbitalCamera);
-    glfwSetWindowUserPointer(Window, &State);
+    Input FragInput;
+    State CurrState(&FragWindow, &FragInput, &OrbitalCamera);
+    glfwSetWindowUserPointer(GLFWWindow, &CurrState);
 
-    State.mProjection = perspective(State.mCamera->mFOV, State.mFramebufferSize.X / (r32) State.mFramebufferSize.Y, 0.1f, 100.0f);
+    CurrState.mProjection = Perspective(CurrState.mCamera->mFOV, CurrState.mFramebufferSize.X / (r32) CurrState.mFramebufferSize.Y, 0.1f, 100.0f);
     m44 View(1.0f);
-    View = lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
+    View = LookAt(CurrState.mCamera->mPosition, CurrState.mCamera->mTarget, CurrState.mCamera->mUp);
 
     // NOTE(Jovan): Set texture scale
     glUseProgram(Phong.mId);
@@ -256,13 +186,13 @@ main() {
     glUseProgram(Phong.mId);
 
     u32 FBO, RBO;
-    _CreateFramebuffer(&FBO, &RBO, &State.mFBOTexture, State.mFramebufferSize.X, State.mFramebufferSize.Y);
+    _CreateFramebuffer(&FBO, &RBO, &CurrState.mFBOTexture, CurrState.mFramebufferSize.X, CurrState.mFramebufferSize.Y);
 
     r32 StartTimeMillis = _CurrentTimeInMillis();
     r32 EndTimeMillis = _CurrentTimeInMillis();
     r32 BeginTimeMillis = _CurrentTimeInMillis();
-    r32 RunningTimeSec = _CurrentTimeInMillis() / 1000.0f;
-    State.mDT = EndTimeMillis - StartTimeMillis;
+    r32 RunningTimeSec = _CurrentTimeInSeconds();
+    CurrState.mDT = EndTimeMillis - StartTimeMillis;
 
     u32 OldFBO;
     u32 OldRBO;
@@ -276,7 +206,25 @@ main() {
     ModelWindow ModelWindow("Model", ImGuiWindowFlags_AlwaysAutoResize);
 
     glEnable(GL_TEXTURE_2D);
-    while(!glfwWindowShouldClose(Window)) {
+
+    Input FragInput2;
+    Input *NewInput = &FragInput;
+    Input *OldInput = &FragInput2;
+    *NewInput = (Input){0};
+    *OldInput = (Input){0};
+    while(!glfwWindowShouldClose(GLFWWindow)) {
+        CurrState.mInput = NewInput;
+        for(u32 i = 0; i < ArrayCount(NewInput->mKeyboard.mButtons); ++i) {
+            NewInput->mKeyboard.mButtons[i] = OldInput->mKeyboard.mButtons[i];
+        }
+        glfwPollEvents();
+        if(FragInput.mKeyboard.mChangeModel) {
+            CurrState.mShowBones = !CurrState.mShowBones;
+        }
+
+        CurrState.mCurrModel = CurrState.mShowBones
+            ? &BonesModel
+            : &MusclesModel;
 
         StartTimeMillis = _CurrentTimeInMillis();
         RunningTimeSec = (_CurrentTimeInMillis() - BeginTimeMillis) / 1000.0f;
@@ -284,12 +232,12 @@ main() {
         glUseProgram(Phong.mId);
         if(Scene.mHasResized) {
             OldFBO = FBO;
-            OldFBOTexture = State.mFBOTexture;
+            OldFBOTexture = CurrState.mFBOTexture;
             OldRBO = RBO;
 
-            _CreateFramebuffer(&FBO, &RBO, &State.mFBOTexture, State.mFramebufferSize.X, State.mFramebufferSize.Y);
+            _CreateFramebuffer(&FBO, &RBO, &CurrState.mFBOTexture, CurrState.mFramebufferSize.X, CurrState.mFramebufferSize.Y);
             glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-            State.mProjection = perspective(State.mCamera->mFOV, State.mFramebufferSize.X / (r32) State.mFramebufferSize.Y, 0.1f, 100.0f);
+            CurrState.mProjection = Perspective(CurrState.mCamera->mFOV, CurrState.mFramebufferSize.X / (r32) CurrState.mFramebufferSize.Y, 0.1f, 100.0f);
 
             glDeleteFramebuffers(1, &OldFBO);
             glDeleteRenderbuffers(1, &OldRBO);
@@ -297,65 +245,78 @@ main() {
             Scene.mHasResized = false;
         }
 
-        Phong.SetUniform4m("uProjection", State.mProjection);
-        Phong.SetUniform3f("uViewPos", State.mCamera->mPosition);
+        Phong.SetUniform4m("uProjection", CurrState.mProjection);
+        Phong.SetUniform3f("uViewPos", CurrState.mCamera->mPosition);
 
         View.LoadIdentity();
-        View = lookAt(State.mCamera->mPosition, State.mCamera->mTarget, State.mCamera->mUp);
+        View = LookAt(CurrState.mCamera->mPosition, CurrState.mCamera->mTarget, CurrState.mCamera->mUp);
         Phong.SetUniform4m("uView", View);
 
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
         glEnable(GL_DEPTH_TEST);
         glClearColor(0x34 / (r32) 255, 0x49 / (r32) 255, 0x5e / (r32) 255, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glViewport(0, 0, State.mFramebufferSize.X, State.mFramebufferSize.Y);
+        glViewport(0, 0, CurrState.mFramebufferSize.X, CurrState.mFramebufferSize.Y);
 
-        // glUseProgram(Debug.mId);
-        // Debug.SetUniform4m("uProjection", State.mProjection);
-        // Debug.SetUniform3f("uViewPos", State.mCamera->mPosition);
-        // Debug.SetUniform4m("uView", View);
-        // Debug.SetUniform1i("uDisplayBoneIdx", State.mDebugBoneIdx);
 
         glUseProgram(RiggedPhong.mId);
-        RiggedPhong.SetUniform4m("uProjection", State.mProjection);
-        RiggedPhong.SetUniform3f("uViewPos", State.mCamera->mPosition);
+        RiggedPhong.SetUniform4m("uProjection", CurrState.mProjection);
+        RiggedPhong.SetUniform3f("uViewPos", CurrState.mCamera->mPosition);
         RiggedPhong.SetUniform4m("uView", View);
-        RiggedPhong.SetUniform1i("uDisplayBoneIdx", State.mDebugBoneIdx);
+        RiggedPhong.SetUniform1i("uDisplayBoneIdx", 0);
 
         // NOTE(Jovan): Render model
-        RenderModel(Dragon, RiggedPhong, RunningTimeSec, ModelVAO, ModelBuffers.mIds[GLBuffers::INDEX_BUFFER]);
+        std::vector<m44> BoneTransforms;
+        CurrState.mCurrModel->CalculateJointTransforms(BoneTransforms, RunningTimeSec);
+        for(u32 i = 0; i < BoneTransforms.size(); ++i) {
+            RiggedPhong.SetUniform4m("uBones[" + std::to_string(i) + "]", BoneTransforms[i]);
+        }
+
+        m44 Model(1.0f);
+        Model
+            .Translate(ModelPosition)
+            .Rotate(quat(v3(1.0f, 0.0f, 0.0f), ModelRotation.X))
+            .Rotate(quat(v3(0.0f, 1.0f, 0.0f), ModelRotation.Y))
+            .Rotate(quat(v3(0.0f, 0.0f, 1.0f), ModelRotation.Z))
+            .Scale(ModelScale);
+        RiggedPhong.SetUniform4m("uModel", Model);
+        CurrState.mCurrModel->Render(RiggedPhong);
+
         glUseProgram(Phong.mId);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glEnable(GL_DEPTH_TEST);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glViewport(0, 0, _WindowWidth, _WindowHeight);
+        glViewport(0, 0, FragWindow.mSize.X, FragWindow.mSize.Y);
         glUseProgram(0);
 
         NewFrameUI();
 
-        Main.Render(&State, _WindowWidth, _WindowHeight);
-        Scene.Render(&State);
-        ModelWindow.Render(Dragon.mFilepath, &Dragon.mPosition[0], &Dragon.mRotation[0] ,&Dragon.mScale[0], Dragon.mNumVertices);
+        Main.Render(&CurrState, FragWindow.mSize.X, FragWindow.mSize.Y);
+        Scene.Render(&CurrState);
+        ModelWindow.Render(CurrState.mCurrModel->mFilePath, &ModelPosition[0], &ModelRotation[0] ,&ModelScale[0], CurrState.mCurrModel->mVerticesCount);
 
         ImGui::Begin("Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::Text("Position: %.2f, %.2f, %.2f", State.mCamera->mPosition.X, State.mCamera->mPosition.Y, State.mCamera->mPosition.Z);
-        ImGui::Text("Pitch: %.2f", State.mCamera->mPitch * 180.0f / PI);
-        ImGui::Text("Yaw: %.2f", State.mCamera->mYaw * 180.0f / PI);
+        ImGui::Text("Position: %.2f, %.2f, %.2f", CurrState.mCamera->mPosition.X, CurrState.mCamera->mPosition.Y, CurrState.mCamera->mPosition.Z);
+        ImGui::Text("Pitch: %.2f", CurrState.mCamera->mPitch * 180.0f / PI);
+        ImGui::Text("Yaw: %.2f", CurrState.mCamera->mYaw * 180.0f / PI);
         ImGui::End();
 
         RenderUI();
 
         EndTimeMillis = _CurrentTimeInMillis();
-        State.mDT = EndTimeMillis - StartTimeMillis;
+        CurrState.mDT = EndTimeMillis - StartTimeMillis;
 
-        glfwSwapBuffers(Window);
-        glfwPollEvents();
+        Input *Tmp = NewInput;
+        NewInput = OldInput;
+        OldInput = NewInput;
+
+        glfwSwapBuffers(GLFWWindow);
     }
 
     DisposeUI();
-    glfwDestroyWindow(Window);
+    glfwDestroyWindow(GLFWWindow);
     glfwTerminate();
     return 0;
 }

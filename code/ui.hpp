@@ -30,7 +30,7 @@ public:
     std::string      mName;
 
     SceneWindow(const std::string &name, ImGuiWindowFlags flags);
-    void Render(EngineState *state);
+    void Render(State *state);
 };
 
 class MainWindow {
@@ -40,7 +40,7 @@ public:
     bool             mInitialized;
 
     MainWindow(const std::string &name, ImGuiWindowFlags flags);
-    void Render(EngineState *state, i32 width, i32 height);
+    void Render(State *state, i32 width, i32 height);
 };
 
 #endif

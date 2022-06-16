@@ -53,7 +53,7 @@ MainWindow::MainWindow(const std::string &name, ImGuiWindowFlags flags) {
 }
 
 void
-MainWindow::Render(EngineState *state, i32 width, i32 height) {
+MainWindow::Render(State *state, i32 width, i32 height) {
     ImVec2 Size(width, height);
     ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
     ImGui::SetNextWindowSize(Size);
@@ -85,10 +85,10 @@ SceneWindow::SceneWindow(const std::string &name, ImGuiWindowFlags flags) {
 }
 
 void
-SceneWindow::Render(EngineState *state) {
+SceneWindow::Render(State *state) {
     ImGui::Begin(mName.c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize); {
         ImGui::BeginChild("SceneRender");
-        state->mSceneWindowFocused = ImGui::IsWindowFocused();
+        state->mWindow->mSceneWindowFocused = ImGui::IsWindowFocused();
         ImVec2 CursorPos = ImGui::GetIO().MousePos;
         if(state->mFirstMouse) {
             state->mCursorPos.X = CursorPos.x;
@@ -100,7 +100,7 @@ SceneWindow::Render(EngineState *state) {
         state->mCursorPos.X = CursorPos.x;
         state->mCursorPos.Y = CursorPos.y;
 
-        if(state->mLeftMouse && state->mSceneWindowFocused) {
+        if(state->mLeftMouse && state->mWindow->mSceneWindowFocused) {
             state->mCamera->Rotate(DX, DY, state->mDT);
         }
 

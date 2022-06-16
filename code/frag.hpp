@@ -1,6 +1,28 @@
 #ifndef FRAG_HPP
 #define FRAG_HPP
 #include "math3d.hpp"
+#include "model.hpp"
+
+struct Window {
+    v2   mSize;
+    bool mSceneWindowFocused;
+
+    Window(i32 width, i32 height);
+};
+
+struct KeyboardController {
+    union {
+        bool mButtons[2];
+        struct {
+            bool mChangeModel;
+            bool mQuit;
+        };
+    };
+};
+
+struct Input {
+    KeyboardController mKeyboard;
+};
 
 // TODO(Jovan): In separate file?
 // TODO(Jovan): Panning?
@@ -12,7 +34,6 @@ public:
     r32         mRotateSpeed;
     r32         mDistance;
     r32         mZoomSpeed;
-
     v3          mWorldUp;
     v3          mPosition;
     v3          mFront;
@@ -21,92 +42,31 @@ public:
     v3          mTarget;
 
     // NOTE(Jovan): Orbital camera constructor
-    Camera(r32 fov, r32 distance, r32 rotateSpeed = 1e-3f, r32 zoomSpeed = 2e-2f, const v3 &worldUp = v3(0.0f, 1.0f, 0.0f), const v3 &target = v3(0.0f)) {
-        mFOV = fov;
-        mDistance = distance;
-        mRotateSpeed = rotateSpeed;
-        mZoomSpeed = zoomSpeed;
-        mWorldUp = worldUp;
-        mTarget = target;
-
-        mYaw = PI_HALF;
-        mPitch = 0.0f;
-        _UpdateVectors();
-    }
-
-    void
-    Rotate(r32 dYaw, r32 dPitch, r32 dt) {
-        dYaw *= mRotateSpeed * dt;
-        dPitch *= mRotateSpeed * dt;
-
-        mYaw -= dYaw;
-        mPitch -= dPitch;
-        if (mYaw > 2.0f * PI) {
-            mYaw -= 2.0f * PI;
-        }
-
-        if (mYaw < 0.0f) {
-            mYaw += 2.0f * PI;
-        }
-
-        if(mPitch > PI_HALF - 1e-4f) {
-            mPitch = PI_HALF - 1e-4f;
-        }
-        if(mPitch < -PI_HALF + 1e-4f) {
-            mPitch = -PI_HALF + 1e-4f;
-        }
-        _UpdateVectors();
-    }
-
-    void
-    Zoom(r32 dy, r32 dt) {
-        dy *= mZoomSpeed * dt;
-        mDistance -= dy;
-        if (mDistance <= 0.5f) {
-            mDistance = 0.5f;
-        }
-
-        _UpdateVectors();
-    }
+    Camera(r32 fov, r32 distance, r32 rotateSpeed = 1e-3f, r32 zoomSpeed = 2e-2f, const v3 &worldUp = v3(0.0f, 1.0f, 0.0f), const v3 &target = v3(0.0f));
+    void Rotate(r32 dYaw, r32 dPitch, r32 dt);
+    void Zoom(r32 dy, r32 dt);
 
 private:
-    void
-    _UpdateVectors() {
-        mPosition.X = mDistance * cos(mYaw) * cos(mPitch);
-        mPosition.Y = -mDistance * sin(mPitch);
-        mPosition.Z = mDistance * sin(mYaw) * cos(mPitch);
-        mFront = (mTarget - mPosition).GetNormalized();
-        mRight = (mFront ^ mWorldUp).GetNormalized();
-        mUp = (mRight ^ mFront).GetNormalized();
-    }
+    void updateVectors();
 };
 
-
-struct EngineState {
+struct State {
     Camera    *mCamera;
-    m44       mProjection;
-    v2        mCursorPos;
-    v2        mFramebufferSize;
-    r32       mDT;
-    u32       mFBOTexture;
+    GLTFModel *mCurrModel;
+    Input     *mInput;
+    Window    *mWindow;
+    m44        mProjection;
+    v2         mCursorPos;
+    v2         mFramebufferSize;
+    r32        mDT;
+    u32        mFBOTexture;
+    bool       mFirstMouse;
+    bool       mLeftMouse;
+    bool       mImGUIInitialized;
+    bool       mShowBones;
 
-    bool      mSceneWindowFocused;
-    bool      mFirstMouse;
-    bool      mLeftMouse;
-    bool      mImGUIInitialized;
-
-    u32       mDebugBoneIdx;
-
-    EngineState(Camera *camera) {
-        mCamera = camera;
-        mProjection = m44(1.0f);
-        mCursorPos = v2(0.0f, 0.0f);
-        mDT = 0.0f;
-        mLeftMouse = false;
-        mImGUIInitialized = false;
-        mSceneWindowFocused = false;
-        mFirstMouse = true;
-        mFramebufferSize = v2(1920, 1080);
-    }
+    State(Window *window, Input *input, Camera *camera);
 };
+
+void RenderAndUpdate();
 #endif
