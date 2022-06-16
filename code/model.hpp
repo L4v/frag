@@ -18,28 +18,28 @@ class GLTFModel {
         Texture(r32 width, r32 height, const u8 *data);
     };
 
-    struct KeyframesV3 {
+    template<typename T> class Keyframes {
+    private:
+        u8 mElementCount;
+
+        r32 calculateInterpolationFactor(T &start, T &end, r64 timeInSeconds);
+    public:
+        Keyframes<T>();
         u32 mCount;
         std::vector<r32> mTimes;
-        std::vector<v3> mValues;
+        std::vector<T> mValues;
 
         void Load(const r32 *timesData, const r32 *valuesData);
-        v3 Interpolate(r64 timeInSeconds);
+        T Interpolate(r64 timeInSeconds);
     };
 
-    struct KeyframesQuat {
-        u32 mCount;
-        std::vector<r32> mTimes;
-        std::vector<quat> mValues;
-
-        void Load(const r32 *timesData, const r32 *valuesData);
-        quat Interpolate(r64 timeInSeconds);
-    };
-
-    struct Keyframes {
-        KeyframesV3 mTranslation;
-        KeyframesQuat mRotation;
-        KeyframesV3 mScale;
+    struct AnimKeyframes {
+        // KeyframesV3 mTranslation;
+        // KeyframesQuat mRotation;
+        // KeyframesV3 mScale;
+        Keyframes<v3> mTranslation;
+        Keyframes<quat> mRotation;
+        Keyframes<v3> mScale;
 
         void Load(const std::string &path, u32 count, const r32 *timesData, const r32 *valuesData);
     };
@@ -48,7 +48,7 @@ class GLTFModel {
         i32 mIdx;
         r64 mDurationInSeconds;
         std::map<i32, std::vector<i32>> mNodeToChannel;
-        std::map<i32, Keyframes> mJointKeyframes;
+        std::map<i32, AnimKeyframes> mJointKeyframes;
 
         Animation(i32 idx);
     };

@@ -1,4 +1,5 @@
 #include "model.hpp"
+#include "math3d.hpp"
 #include "shader.hpp"
 #include "types.hpp"
 #include <algorithm>
@@ -30,20 +31,26 @@ GLTFModel::Texture::Texture(r32 width, r32 height, const u8 *data) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 }
 
-void
-GLTFModel::KeyframesV3::Load(const r32 *timesData, const r32 *valuesData) {
+template<>
+GLTFModel::Keyframes<quat>::Keyframes() {
+    mElementCount = 4;
+}
+
+template<typename T>
+GLTFModel::Keyframes<T>::Keyframes() {
+    mElementCount = 3;
+}
+
+template<typename T> void
+GLTFModel::Keyframes<T>::Load(const r32 *timesData, const r32 *valuesData) {
     mValues.resize(mCount);
     mTimes.resize(mCount);
     memcpy(mTimes.data(), timesData, mCount * sizeof(r32));
-    memcpy(mValues.data(), valuesData, mCount * 3 * sizeof(r32));
+    memcpy(mValues.data(), valuesData, mCount * mElementCount * sizeof(r32));
 }
 
-v3
-GLTFModel::KeyframesV3::Interpolate(r64 timeInSeconds) {
-    if(mTimes.size() == 1) {
-        return mValues[0];
-    }
-
+template<typename T> r32
+GLTFModel::Keyframes<T>::calculateInterpolationFactor(T &start, T &end, r64 timeInSeconds) {
     u32 StartIdx = 0;
     u32 EndIdx = 0;
 
@@ -57,49 +64,37 @@ GLTFModel::KeyframesV3::Interpolate(r64 timeInSeconds) {
     EndIdx = StartIdx + 1;
     r32 T1 = mTimes[StartIdx];
     r32 T2 = mTimes[EndIdx];
-    v3 Begin = mValues[StartIdx];
-    v3 End = mValues[EndIdx];
     r32 Factor = (timeInSeconds - T1) / (T2 - T1);
+    start = mValues[StartIdx];
+    end = mValues[EndIdx];
 
-    return Lerp(Begin, End, Factor);
+    return Factor;
 }
 
-void
-GLTFModel::KeyframesQuat::Load(const r32 *timesData, const r32 *valuesData) {
-    mValues.resize(mCount);
-    mTimes.resize(mCount);
-    memcpy(mTimes.data(), timesData, mCount * sizeof(r32));
-    memcpy(mValues.data(), valuesData, mCount * 4 * sizeof(r32));
-}
-
-quat
-GLTFModel::KeyframesQuat::Interpolate(r64 timeInSeconds) {
+template<> quat
+GLTFModel::Keyframes<quat>::Interpolate(r64 timeInSeconds) {
     if(mTimes.size() == 1) {
         return mValues[0];
     }
 
-    u32 StartIdx = 0;
-    u32 EndIdx = 0;
+    quat Start, End;
+    r32 Factor = calculateInterpolationFactor(Start, End, timeInSeconds);
+    return Slerp(Start, End, Factor).GetNormalized();
+}
 
-    for(u32 i = 0; i < mTimes.size() - 1; ++i) {
-        if(mTimes[i + 1] > timeInSeconds) {
-            break;
-        }
-        StartIdx = i;
+template<typename T> T
+GLTFModel::Keyframes<T>::Interpolate(r64 timeInSeconds) {
+    if(mTimes.size() == 1) {
+        return mValues[0];
     }
 
-    EndIdx = StartIdx + 1;
-    r32 T1 = mTimes[StartIdx];
-    r32 T2 = mTimes[EndIdx];
-    quat Begin = mValues[StartIdx];
-    quat End = mValues[EndIdx];
-    r32 Factor = (timeInSeconds - T1) / (T2 - T1);
-    quat Slerped = Slerp(Begin, End, Factor);
-    return Slerped.GetNormalized();
+    T Start, End;
+    r32 Factor = calculateInterpolationFactor(Start, End, timeInSeconds);
+    return Lerp(Start, End, Factor);
 }
 
 void
-GLTFModel::Keyframes::Load(const std::string &path, u32 count, const r32 *timesData, const r32 *valuesData) {
+GLTFModel::AnimKeyframes::Load(const std::string &path, u32 count, const r32 *timesData, const r32 *valuesData) {
     if(path == "translation") {
         mTranslation.mCount = count;
         mTranslation.Load(timesData, valuesData);
@@ -231,12 +226,12 @@ GLTFModel::loadAnimations(tinygltf::Model *tinyModel) {
                     const std::vector<r32> Times = LoadFloats(tinyModel, Sampler.input);
                     const std::vector<r32> Values = LoadFloats(tinyModel, Sampler.output);
                     const std::string &Path = Channel.target_path;
-                    std::map<i32, Keyframes>::iterator KeyframesIt = CurrAnim.mJointKeyframes.find(J.mIdx);
+                    std::map<i32, AnimKeyframes>::iterator KeyframesIt = CurrAnim.mJointKeyframes.find(J.mIdx);
 
                     CurrAnim.mDurationInSeconds = std::max(CurrAnim.mDurationInSeconds, Input.maxValues[0]);
 
                     if(KeyframesIt == CurrAnim.mJointKeyframes.end()) {
-                        CurrAnim.mJointKeyframes[J.mIdx] = Keyframes();
+                        CurrAnim.mJointKeyframes[J.mIdx] = AnimKeyframes();
                         KeyframesIt = CurrAnim.mJointKeyframes.find(J.mIdx);
                     }
 
@@ -259,9 +254,9 @@ GLTFModel::CalculateJointTransforms(std::vector<m44> &jointTransforms, r64 timeI
         const Joint &J = mJoints[i];
         if(mAnimations.size() > 0) {
             Animation &CurrAnim = mAnimations[mActiveAnimation];
-            std::map<i32, Keyframes>::iterator KeyframesIt = CurrAnim.mJointKeyframes.find(J.mIdx);
+            std::map<i32, AnimKeyframes>::iterator KeyframesIt = CurrAnim.mJointKeyframes.find(J.mIdx);
             if(KeyframesIt != CurrAnim.mJointKeyframes.end()) {
-                Keyframes K = KeyframesIt->second;
+                AnimKeyframes K = KeyframesIt->second;
                 m44 T(1.0);
                 m44 R(1.0);
                 m44 S(1.0);
