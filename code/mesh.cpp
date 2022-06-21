@@ -18,7 +18,7 @@ Mesh::Vertex::Vertex(const r32 *position, const r32 *normal, const r32 *texCoord
 Mesh::Mesh(const std::vector<Vertex> &vertices, const std::vector<u32> &indices) {
     mVertices = std::vector<Vertex>(vertices);
     mIndices = std::vector<u32>(indices);
-
+    
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
     glGenBuffers(1, &VBO);
