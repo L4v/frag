@@ -50,7 +50,7 @@ errorCallback(int error, const char* description) {
 static void
 framebufferSizeCallback(GLFWwindow *window, i32 width, i32 height) {
     State *CurrState = (State*)glfwGetWindowUserPointer(window);
-    CurrState->mWindow.mFramebuffer.mSize = v2(width, height);
+    CurrState->mWindow.mSize = v2(width, height);
 }
 
 static void
@@ -153,6 +153,8 @@ main() {
     // NOTE(Jovan): Camera init
     Camera OrbitalCamera(45.0f, 2.0f);
     State CurrState(&OrbitalCamera);
+    FramebufferGL *Framebuffer = &CurrState.mFramebuffer;
+    glBindFramebuffer(GL_FRAMEBUFFER, Framebuffer->mId);
     glfwSetWindowUserPointer(GLFWWindow, &CurrState);
 
     // NOTE(Jovan): Init imgui
@@ -173,7 +175,7 @@ main() {
     std::vector<u32> Indices;
     std::vector<Texture> ModelTextures;
 
-    CurrState.mProjection = Perspective(CurrState.mCamera->mFOV, CurrState.mFramebufferSize.X / (r32) CurrState.mFramebufferSize.Y, 0.1f, 100.0f);
+    CurrState.mProjection = Perspective(CurrState.mCamera->mFOV, Framebuffer->mSize.X / (r32) Framebuffer->mSize.Y, 0.1f, 100.0f);
     m44 View(1.0f);
     View = LookAt(CurrState.mCamera->mPosition, CurrState.mCamera->mTarget, CurrState.mCamera->mUp);
 
@@ -196,19 +198,11 @@ main() {
     RiggedPhong.SetPointLight(PointLight, 0);
     glUseProgram(Phong.mId);
 
-    // u32 FBO, RBO;
-    // createFramebuffer(&FBO, &RBO, &CurrState.mFBOTexture, CurrState.mFramebufferSize.X, CurrState.mFramebufferSize.Y);
-    FramebufferGL Framebuffer(CurrState.mFramebufferSize);
-
     r32 StartTimeMillis = currentTimeInMillis();
     r32 EndTimeMillis = currentTimeInMillis();
     r32 BeginTimeMillis = currentTimeInMillis();
     r32 RunningTimeSec = currentTimeInSeconds();
     CurrState.mDT = EndTimeMillis - StartTimeMillis;
-
-    u32 OldFBO;
-    u32 OldRBO;
-    u32 OldFBOTexture;
 
     ImGuiWindowFlags MainWindowFlags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar
         | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus
@@ -218,19 +212,17 @@ main() {
     ModelWindow ModelWindow("Model", ImGuiWindowFlags_AlwaysAutoResize);
 
     glEnable(GL_TEXTURE_2D);
-
+    GLbitfield ClearMask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
+    v4 ClearColor(0x34 / (r32) 255, 0x49 / (r32) 255, 0x5e / (r32) 255, 1.0f);
     while(!glfwWindowShouldClose(GLFWWindow)) {
         StartTimeMillis = currentTimeInMillis();
         RunningTimeSec = (currentTimeInMillis() - BeginTimeMillis) / 1000.0f;
         CurrState.BeginFrame();
         glfwPollEvents();
-        UpdateAndRender(&CurrState);
         
         glUseProgram(Phong.mId);
         if(Scene.mHasResized) {
-            Framebuffer.Resize(CurrState.mFramebufferSize);
-            glBindFramebuffer(GL_FRAMEBUFFER, Framebuffer.mId);
-            CurrState.mProjection = Perspective(CurrState.mCamera->mFOV, CurrState.mFramebufferSize.X / (r32) CurrState.mFramebufferSize.Y, 0.1f, 100.0f);
+            CurrState.mProjection = Perspective(CurrState.mCamera->mFOV, Framebuffer->mSize.X / (r32) Framebuffer->mSize.Y, 0.1f, 100.0f);
             Scene.mHasResized = false;
         }
 
@@ -241,12 +233,7 @@ main() {
         View = LookAt(CurrState.mCamera->mPosition, CurrState.mCamera->mTarget, CurrState.mCamera->mUp);
         Phong.SetUniform4m("uView", View);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, Framebuffer.mId);
-        glEnable(GL_DEPTH_TEST);
-        glClearColor(0x34 / (r32) 255, 0x49 / (r32) 255, 0x5e / (r32) 255, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glViewport(0, 0, CurrState.mFramebufferSize.X, CurrState.mFramebufferSize.Y);
-
+        FramebufferGL::Bind(Framebuffer->mId, ClearColor, ClearMask, Framebuffer->mSize);
 
         glUseProgram(RiggedPhong.mId);
         RiggedPhong.SetUniform4m("uProjection", CurrState.mProjection);
@@ -255,6 +242,7 @@ main() {
         RiggedPhong.SetUniform1i("uDisplayBoneIdx", 0);
 
         // NOTE(Jovan): Render model
+        UpdateAndRender(&CurrState);
         std::vector<m44> BoneTransforms;
         CurrState.mCurrModel->CalculateJointTransforms(BoneTransforms, RunningTimeSec);
         for(u32 i = 0; i < BoneTransforms.size(); ++i) {
@@ -271,18 +259,12 @@ main() {
         RiggedPhong.SetUniform4m("uModel", Model);
         CurrState.mCurrModel->Render(RiggedPhong);
 
-        glUseProgram(Phong.mId);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glEnable(GL_DEPTH_TEST);
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glViewport(0, 0, CurrState.mWindow.mFramebuffer.mSize.X, CurrState.mWindow.mFramebuffer.mSize.Y);
+        FramebufferGL::Bind(0, ClearColor, ClearMask, CurrState.mWindow.mSize);
         glUseProgram(0);
 
         NewFrameUI();
 
-        Main.Render(&CurrState, CurrState.mWindow.mFramebuffer.mSize.X, CurrState.mWindow.mFramebuffer.mSize.Y);
+        Main.Render(&CurrState, CurrState.mWindow.mSize.X, CurrState.mWindow.mSize.Y);
         Scene.Render(&CurrState);
         ModelWindow.Render(&CurrState, CurrState.mCurrModel->mFilePath, &ModelPosition[0], &ModelRotation[0] ,&ModelScale[0], CurrState.mCurrModel->mVerticesCount);
 

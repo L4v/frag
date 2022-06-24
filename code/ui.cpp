@@ -1,4 +1,5 @@
 #include "ui.hpp"
+#include "frag.hpp"
 
 void
 InitUI(GLFWwindow *window) {
@@ -93,13 +94,12 @@ SceneWindow::Render(State *state) {
         state->mWindow.mSceneWindowFocused = ImGui::IsWindowFocused();
 
         ImVec2 WindowSize = ImGui::GetWindowSize();
-        if (state->mFramebufferSize.X != WindowSize.x || state->mFramebufferSize.Y != WindowSize.y) {
+        if (state->mFramebuffer.mSize.X != WindowSize.x || state->mFramebuffer.mSize.Y != WindowSize.y) {
+            state->mFramebuffer.Resize(WindowSize.x, WindowSize.y);
             mHasResized = true;
         }
-        state->mFramebufferSize.X = WindowSize.x;
-        state->mFramebufferSize.Y = WindowSize.y;
 
-        ImGui::Image((ImTextureID)state->mWindow.mFramebuffer.mTexture, WindowSize, ImVec2(0, 1), ImVec2(1, 0));
+        ImGui::Image((ImTextureID)state->mFramebuffer.mTexture, WindowSize, ImVec2(0, 1), ImVec2(1, 0));
         ImGui::EndChild();
     } ImGui::End();
 }

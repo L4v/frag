@@ -7,7 +7,7 @@
 #include "model.hpp"
 
 struct Window {
-    FramebufferGL mFramebuffer;
+    v2            mSize;
     bool          mSceneWindowFocused;
 
     Window(u32 width, u32 height);
@@ -76,20 +76,20 @@ private:
 
 class State {
 private:
-    Input      mInputBuffers[2] = {0};
-    Input     *mNewInput;
-    Input     *mOldInput;
-    GLTFModel  mBonesModel;
-    GLTFModel  mMusclesModel;
+    Input         mInputBuffers[2] = {0};
+    Input        *mNewInput;
+    Input        *mOldInput;
+    GLTFModel     mBonesModel;
+    GLTFModel     mMusclesModel;
 public:
-    Camera     *mCamera;
-    GLTFModel  *mCurrModel;
-    Window      mWindow;
-    m44         mProjection;
-    v2          mFramebufferSize;
-    r32         mDT;
-    bool        mImGUIInitialized;
-    bool        mShowBones;
+    FramebufferGL mFramebuffer;
+    Camera       *mCamera;
+    GLTFModel    *mCurrModel;
+    Window        mWindow;
+    m44           mProjection;
+    r32           mDT;
+    bool          mImGUIInitialized;
+    bool          mShowBones;
 
     State(Camera *camera);
 

@@ -83,12 +83,13 @@ Camera::updateVectors() {
     mUp = (mRight ^ mFront).GetNormalized();
 }
 
-Window::Window(u32 width, u32 height) : mFramebuffer(width, height) {;
+Window::Window(u32 width, u32 height) : mSize(width, height) {;
     mSceneWindowFocused = false;
 }
 
 State::State(Camera *camera) 
 : mWindow(800, 600),
+ mFramebuffer(1920, 1080),
  mCamera(camera),
  mBonesModel("../res/backleg_bones.gltf"),
  mMusclesModel("../res/backleg_muscles.glb") {
@@ -98,7 +99,6 @@ State::State(Camera *camera)
     mProjection = m44(1.0f);
     mDT = 0.0f;
     mImGUIInitialized = false;
-    mFramebufferSize = v2(1920, 1080);
     mShowBones = true;
 }
 
