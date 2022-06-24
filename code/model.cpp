@@ -327,7 +327,7 @@ GLTFModel::getLocalTransform(const tinygltf::Node &node) {
 }
 
 void
-GLTFModel::Render(const ShaderProgram &program) {
+GLTFModel::Render(const Shader &program) {
     for(u32 i = 0; i < mMeshes.size(); ++i) {
         mMeshes[i].Render(program);
     }

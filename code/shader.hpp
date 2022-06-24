@@ -27,9 +27,9 @@ struct Light {
 struct GLBuffers {
     enum EBufferType {
         INDEX_BUFFER = 0,
-        POS_VB,
+        POSITION_VB,
         TEXCOORD_VB,
-        NORM_VB,
+        NORMAL_VB,
         BONE_VB,
 
         BUFFER_COUNT,
@@ -47,9 +47,9 @@ struct GLBuffers {
 
     GLBuffers();
     void Destroy();
-    void BufferData(EBufferType type, GLsizeiptr size, const void *data, GLenum target = GL_ARRAY_BUFFER, GLenum usage = GL_STATIC_DRAW);
-    void SetPointer(EBufferType bufferType, GLuint index, GLint size, GLenum type, GLsizei stride, const void *pointer, GLboolean normalized = GL_FALSE, GLenum target = GL_ARRAY_BUFFER);
-    void SetIPointer(EBufferType bufferType, GLuint index, GLint size, GLenum type, GLsizei stride, const void *pointer, GLenum target = GL_ARRAY_BUFFER);
+    void BufferData(EBufferType bufferType, GLsizeiptr dataSize, const void *data, GLenum target = GL_ARRAY_BUFFER, GLenum usage = GL_STATIC_DRAW);
+    void SetPointer(EBufferType bufferType, GLuint attribIndex, GLint size, GLenum dataType, GLsizei stride, const void *pointer, GLboolean normalized = GL_FALSE, GLenum target = GL_ARRAY_BUFFER);
+    void SetIPointer(EBufferType bufferType, GLuint attribIndex, GLint size, GLenum dataType, GLsizei stride, const void *pointer, GLenum target = GL_ARRAY_BUFFER);
     
 };
 
@@ -68,11 +68,11 @@ struct Texture {
     ~Texture();
 };
 
-class ShaderProgram {
+class Shader {
 public:
     u32 mId;
 
-    ShaderProgram(const std::string &vShaderPath, const std::string &fShaderPath);
+    Shader(const std::string &vShaderPath, const std::string &fShaderPath);
     void SetPointLight(const Light &light, u32 index);
     void SetUniform1i(const std::string &uniform, i32 i) const;
     void SetUniform1f(const std::string &uniform, r32 f) const;

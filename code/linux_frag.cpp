@@ -15,33 +15,6 @@
 static const i32 DefaultWindowWidth = 800;
 static const i32 DefaultWindowHeight = 600;
 
-// void
-// createFramebuffer(u32 *fbo, u32 *rbo, u32 *texture, i32 width, i32 height) {
-//     // TODO(Jovan): Tidy up
-//     glGenFramebuffers(1, fbo);
-//     glBindFramebuffer(GL_FRAMEBUFFER, *fbo);
-
-//     glGenTextures(1, texture);
-//     glBindTexture(GL_TEXTURE_2D, *texture);
-//     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, (void*)0);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-//     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *texture, 0);
-
-//     glGenRenderbuffers(1, rbo);
-//     glBindRenderbuffer(GL_RENDERBUFFER, *rbo);
-//     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
-//     glBindRenderbuffer(GL_RENDERBUFFER, 0);
-//     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, *rbo);
-
-//     // TODO(Jovan): Check for concrete errors
-//     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-//         std::cerr << "[Err] Framebuffer not complete" << std::endl;
-//     }
-
-//     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-// }
-
 static void
 errorCallback(int error, const char* description) {
     std::cerr << "[Err] GLFW: " << description << std::endl;
@@ -160,9 +133,9 @@ main() {
     // NOTE(Jovan): Init imgui
     InitUI(GLFWWindow);
 
-    ShaderProgram Phong("../shaders/basic.vert", "../shaders/basic.frag");
-    ShaderProgram RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
-    ShaderProgram Debug("../shaders/debug.vert", "../shaders/debug.frag");
+    Shader Phong("../shaders/basic.vert", "../shaders/basic.frag");
+    Shader RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
+    Shader Debug("../shaders/debug.vert", "../shaders/debug.frag");
     
     v3 ModelPosition = v3(0.0f, 4.0f, -8.0f);
     v3 ModelRotation = v3(0.0f, 0.0f, 0.0f);

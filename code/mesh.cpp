@@ -50,7 +50,7 @@ Mesh::Mesh(const std::vector<Vertex> &vertices, const std::vector<u32> &indices)
 }
 
 void
-Mesh::Render(const ShaderProgram &program) {
+Mesh::Render(const Shader &program) {
     glUseProgram(program.mId);
 
     if(mMaterial.mDiffuseId >= 0) {
