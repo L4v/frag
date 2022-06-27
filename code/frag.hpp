@@ -1,5 +1,6 @@
 #ifndef FRAG_HPP
 #define FRAG_HPP
+#include "util.hpp"
 #include "math3d.hpp"
 #include "model.hpp"
 
@@ -50,22 +51,29 @@ private:
     void updateVectors();
 };
 
-struct State {
-    Camera    *mCamera;
+class State {
+private:
+    Input  mInputs[2];
+    Input *mInputBuffer[2];
+
+public:
     GLTFModel *mCurrModel;
-    Input     *mInput;
-    Window    *mWindow;
     m44        mProjection;
     v2         mCursorPos;
     v2         mFramebufferSize;
-    r32        mDT;
-    u32        mFBOTexture;
     bool       mFirstMouse;
-    bool       mLeftMouse;
     bool       mImGUIInitialized;
+    Camera    *mCamera;
+    Input     *mInput;
+    Window    *mWindow;
+    u32        mFBOTexture;
+    r32        mDT;
+    bool       mLeftMouse;
     bool       mShowBones;
 
-    State(Window *window, Input *input, Camera *camera);
+    State(Window *window, Camera *camera);
+    void BeginFrame();
+    void EndFrame();
 };
 
 void RenderAndUpdate();

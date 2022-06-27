@@ -158,8 +158,7 @@ main() {
 
     // NOTE(Jovan): Camera init
     Camera OrbitalCamera(45.0f, 2.0f);
-    Input FragInput;
-    State CurrState(&FragWindow, &FragInput, &OrbitalCamera);
+    State CurrState(&FragWindow, &OrbitalCamera);
     glfwSetWindowUserPointer(GLFWWindow, &CurrState);
 
     CurrState.mProjection = Perspective(CurrState.mCamera->mFOV, CurrState.mFramebufferSize.X / (r32) CurrState.mFramebufferSize.Y, 0.1f, 100.0f);
@@ -207,9 +206,9 @@ main() {
 
     glEnable(GL_TEXTURE_2D);
 
-    Input FragInput2;
-    Input *NewInput = &FragInput;
-    Input *OldInput = &FragInput2;
+    Input Inputs[2];
+    Input *NewInput = &Inputs[0];
+    Input *OldInput = &Inputs[1];
     *NewInput = (Input){0};
     *OldInput = (Input){0};
     while(!glfwWindowShouldClose(GLFWWindow)) {
@@ -217,8 +216,9 @@ main() {
         for(u32 i = 0; i < ArrayCount(NewInput->mKeyboard.mButtons); ++i) {
             NewInput->mKeyboard.mButtons[i] = OldInput->mKeyboard.mButtons[i];
         }
+
         glfwPollEvents();
-        if(FragInput.mKeyboard.mChangeModel) {
+        if(Inputs[0].mKeyboard.mChangeModel) {
             CurrState.mShowBones = !CurrState.mShowBones;
         }
 
@@ -272,14 +272,14 @@ main() {
             RiggedPhong.SetUniform4m("uBones[" + std::to_string(i) + "]", BoneTransforms[i]);
         }
 
-        m44 Model(1.0f);
-        Model
+        
+        CurrState.mCurrModel->mModelTransform
+            .LoadIdentity()
             .Translate(ModelPosition)
             .Rotate(quat(v3(1.0f, 0.0f, 0.0f), ModelRotation.X))
             .Rotate(quat(v3(0.0f, 1.0f, 0.0f), ModelRotation.Y))
             .Rotate(quat(v3(0.0f, 0.0f, 1.0f), ModelRotation.Z))
             .Scale(ModelScale);
-        RiggedPhong.SetUniform4m("uModel", Model);
         CurrState.mCurrModel->Render(RiggedPhong);
 
         glUseProgram(Phong.mId);

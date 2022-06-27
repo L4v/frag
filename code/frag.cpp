@@ -63,9 +63,11 @@ Window::Window(i32 width, i32 height) {
     mSceneWindowFocused = false;
 }
 
-State::State(Window *window, Input *input, Camera *camera) {
+State::State(Window *window, Camera *camera) {
     mWindow = window;
-    mInput = input;
+    mInputBuffer[0] = &mInputs[0];
+    mInputBuffer[1] = &mInputs[1];
+    mInput = mInputBuffer[0];
     mCamera = camera;
     mProjection = m44(1.0f);
     mCursorPos = v2(0.0f, 0.0f);
@@ -75,4 +77,17 @@ State::State(Window *window, Input *input, Camera *camera) {
     mFirstMouse = true;
     mFramebufferSize = v2(1920, 1080);
     mShowBones = true;
+}
+
+void
+State::BeginFrame() {
+    mInput = mInputBuffer[0];
+    for(u32 i = 0; i < ArrayCount(mInputBuffer[0]->mKeyboard.mButtons); ++i) {
+        mInputBuffer[0]->mKeyboard.mButtons[i] = mInputBuffer[1]->mKeyboard.mButtons[i];
+    }
+}
+
+void
+State::EndFrame() {
+    std::swap(mInputBuffer[0], mInputBuffer[1]);
 }

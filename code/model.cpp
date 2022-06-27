@@ -113,6 +113,7 @@ GLTFModel::Animation::Animation(i32 idx) {
 }
 
 GLTFModel::GLTFModel(const std::string &filePath) {
+    mModelTransform.LoadIdentity();
     tinygltf::Model tinyModel;
     loadModel(&tinyModel, filePath);
     loadNodes(&tinyModel);
@@ -328,6 +329,7 @@ GLTFModel::getLocalTransform(const tinygltf::Node &node) {
 
 void
 GLTFModel::Render(const ShaderProgram &program) {
+    program.SetUniform4m("uModel", mModelTransform);
     for(u32 i = 0; i < mMeshes.size(); ++i) {
         mMeshes[i].Render(program);
     }
