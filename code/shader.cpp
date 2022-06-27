@@ -14,25 +14,25 @@ GLBuffers::Destroy() {
 }
 
 void
-GLBuffers::SetPointer(EBufferType bufferType, GLuint index, GLint size, GLenum type, GLsizei stride, const void *pointer, GLboolean normalized, GLenum target){
+GLBuffers::SetPointer(EBufferType bufferType, GLuint index, GLint size, GLenum dataType, GLsizei stride, const void *pointer, GLboolean normalized, GLenum target){
     glBindBuffer(target, mIds[bufferType]);
-    glVertexAttribPointer(index, size, type, normalized, stride, pointer);
+    glVertexAttribPointer(index, size, dataType, normalized, stride, pointer);
     glEnableVertexAttribArray(index);
     glBindBuffer(target, 0);
 }
 
 void
-GLBuffers::SetIPointer(EBufferType bufferType, GLuint index, GLint size, GLenum type, GLsizei stride, const void *pointer, GLenum target) {
+GLBuffers::SetIPointer(EBufferType bufferType, GLuint attribIndex, GLint size, GLenum dataType, GLsizei stride, const void *pointer, GLenum target) {
     glBindBuffer(target, mIds[bufferType]);
-    glVertexAttribIPointer(index, size, type, stride, pointer);
-    glEnableVertexAttribArray(index);
+    glVertexAttribIPointer(attribIndex, size, dataType, stride, pointer);
+    glEnableVertexAttribArray(attribIndex);
     glBindBuffer(target, 0);
 }
 
 void
-GLBuffers::BufferData(EBufferType type, GLsizeiptr size, const void *data, GLenum target, GLenum usage) {
-    glBindBuffer(target, mIds[type]);
-    glBufferData(target, size, data, usage);
+GLBuffers::BufferData(EBufferType bufferType, GLsizeiptr dataSize, const void *data, GLenum target, GLenum usage) {
+    glBindBuffer(target, mIds[bufferType]);
+    glBufferData(target, dataSize, data, usage);
     glBindBuffer(target, 0);
 }
 
@@ -73,14 +73,14 @@ Texture::~Texture() {
     // glDeleteTextures(1, &mId);
 }
 
-ShaderProgram::ShaderProgram(const std::string &vShaderPath, const std::string &fShaderPath) {
+Shader::Shader(const std::string &vShaderPath, const std::string &fShaderPath) {
     u32 vs = loadAndCompileShader(vShaderPath, GL_VERTEX_SHADER);
     u32 fs = loadAndCompileShader(fShaderPath, GL_FRAGMENT_SHADER);
     mId = createBasicProgram(vs, fs);
 }
 
 u32
-ShaderProgram::loadAndCompileShader(std::string filename, GLuint shaderType) {
+Shader::loadAndCompileShader(std::string filename, GLuint shaderType) {
     u32 ShaderID = 0;
     std::ifstream In(filename);
     std::string Str;
@@ -110,7 +110,7 @@ ShaderProgram::loadAndCompileShader(std::string filename, GLuint shaderType) {
 }
 
 u32
-ShaderProgram::createBasicProgram(u32 vShader, u32 fShader) {
+Shader::createBasicProgram(u32 vShader, u32 fShader) {
     u32 ProgramID = 0;
     ProgramID = glCreateProgram();
     glAttachShader(ProgramID, vShader);
@@ -135,7 +135,7 @@ ShaderProgram::createBasicProgram(u32 vShader, u32 fShader) {
 }
 
 void
-ShaderProgram::SetPointLight(const Light &light, u32 index) {
+Shader::SetPointLight(const Light &light, u32 index) {
     SetUniform3f("uPointLights[0].Ambient", light.Ambient);
     SetUniform3f("uPointLights[0].Diffuse", light.Diffuse);
     SetUniform3f("uPointLights[0].Specular", light.Specular);
@@ -146,26 +146,26 @@ ShaderProgram::SetPointLight(const Light &light, u32 index) {
 }
 
 void
-ShaderProgram::SetUniform1i(const std::string &uniform, i32 i) const {
+Shader::SetUniform1i(const std::string &uniform, i32 i) const {
     glUniform1i(glGetUniformLocation(mId, uniform.c_str()), i);
 }
 
 void
-ShaderProgram::SetUniform1f(const std::string &uniform, r32 f) const {
+Shader::SetUniform1f(const std::string &uniform, r32 f) const {
     glUniform1f(glGetUniformLocation(mId, uniform.c_str()), f);
 }
 
 void
-ShaderProgram::SetUniform3f(const std::string &uniform, const v3 &v) const {
+Shader::SetUniform3f(const std::string &uniform, const v3 &v) const {
     glUniform3fv(glGetUniformLocation(mId, uniform.c_str()), 1, &v[0]);
 }
 
 void
-ShaderProgram::SetUniform4m(const std::string &uniform, const m44 &m, GLboolean transpose) const {
+Shader::SetUniform4m(const std::string &uniform, const m44 &m, GLboolean transpose) const {
     glUniformMatrix4fv(glGetUniformLocation(mId, uniform.c_str()), 1, transpose, &m[0][0]);
 }
 
 void
-ShaderProgram::SetUniform4m(const std::string &uniform, const std::vector<m44> &m, GLboolean transpose) const {
+Shader::SetUniform4m(const std::string &uniform, const std::vector<m44> &m, GLboolean transpose) const {
     glUniformMatrix4fv(glGetUniformLocation(mId, uniform.c_str()), m.size(), transpose, (GLfloat*)&m[0]);
 }

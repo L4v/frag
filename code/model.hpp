@@ -95,7 +95,7 @@ public:
     u32 mVerticesCount;
     m44 mModelTransform;
     GLTFModel(const std::string &filePath);
-    void Render(const ShaderProgram &program);
+    void Render(const Shader &program);
     void CalculateJointTransforms(std::vector<m44> &jointTransforms, r64 timeInSeconds);
 };
 

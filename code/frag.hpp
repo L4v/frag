@@ -1,28 +1,50 @@
 #ifndef FRAG_HPP
 #define FRAG_HPP
+#include "framebuffer_gl.hpp"
+#include "types.hpp"
 #include "util.hpp"
 #include "math3d.hpp"
 #include "model.hpp"
 
 struct Window {
-    v2   mSize;
-    bool mSceneWindowFocused;
+    v2            mSize;
+    bool          mSceneWindowFocused;
 
-    Window(i32 width, i32 height);
+    Window(u32 width, u32 height);
+};
+
+struct ButtonState {
+    bool mEndedDown;
+    u32  mHalfTransitionCount;
+};
+
+struct MouseController {
+    union {
+        ButtonState mButtons[2];
+        struct {
+            ButtonState mLeft;
+            ButtonState mRight;
+        };
+    };
+    v2 mCursorPos = v2(0.0f, 0.0f);
+    v2 mCursorDiff = v2(0.0f, 0.0f);
+    r32 mScrollOffset;
 };
 
 struct KeyboardController {
     union {
-        bool mButtons[2];
+        ButtonState mButtons[2];
         struct {
-            bool mChangeModel;
-            bool mQuit;
+            ButtonState mChangeModel;
+            ButtonState mQuit;
         };
     };
 };
 
 struct Input {
+    bool mFirstMouse = true;
     KeyboardController mKeyboard;
+    MouseController mMouse;
 };
 
 // TODO(Jovan): In separate file?
@@ -43,8 +65,9 @@ public:
     v3          mTarget;
 
     // NOTE(Jovan): Orbital camera constructor
-    Camera(r32 fov, r32 distance, r32 rotateSpeed = 1e-3f, r32 zoomSpeed = 2e-2f, const v3 &worldUp = v3(0.0f, 1.0f, 0.0f), const v3 &target = v3(0.0f));
+    Camera(r32 fov, r32 distance, r32 rotateSpeed = 1e-3f, r32 zoomSpeed = 1.0f, const v3 &worldUp = v3(0.0f, 1.0f, 0.0f), const v3 &target = v3(0.0f));
     void Rotate(r32 dYaw, r32 dPitch, r32 dt);
+    void Rotate(v2 diffs, r32 dt);
     void Zoom(r32 dy, r32 dt);
 
 private:
@@ -53,28 +76,30 @@ private:
 
 class State {
 private:
-    Input  mInputs[2];
-    Input *mInputBuffer[2];
-
+    Input         mInputBuffers[2] = {0};
+    Input        *mNewInput;
+    Input        *mOldInput;
+    GLTFModel     mBonesModel;
+    GLTFModel     mMusclesModel;
 public:
-    GLTFModel *mCurrModel;
-    m44        mProjection;
-    v2         mCursorPos;
-    v2         mFramebufferSize;
-    bool       mFirstMouse;
-    bool       mImGUIInitialized;
-    Camera    *mCamera;
-    Input     *mInput;
-    Window    *mWindow;
-    u32        mFBOTexture;
-    r32        mDT;
-    bool       mLeftMouse;
-    bool       mShowBones;
+    FramebufferGL mFramebuffer;
+    Camera       *mCamera;
+    GLTFModel    *mCurrModel;
+    Window        mWindow;
+    m44           mProjection;
+    r32           mDT;
+    bool          mImGUIInitialized;
+    bool          mShowBones;
 
-    State(Window *window, Camera *camera);
+    State(Camera *camera);
+
     void BeginFrame();
     void EndFrame();
+    Input& GetNewInput();
+    const Input& GetOldInput();
+    void UpdateModel();
 };
 
-void RenderAndUpdate();
+void UpdateAndRender(State *state);
+
 #endif
