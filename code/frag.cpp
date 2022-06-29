@@ -1,21 +1,25 @@
 #include "frag.hpp"
 #include "math3d.hpp"
 
-Camera::Camera(r32 fov, r32 distance, r32 rotateSpeed, r32 zoomSpeed, const v3 &worldUp, const v3 &target)  {
+OrbitalCamera::OrbitalCamera(r32 fov, r32 distance, r32 rotateSpeed, r32 zoomSpeed, const v3 &worldUp, const v3 &target)
+    : mWorldUp(worldUp),
+      mTarget(target),
+      mLeftRight(-10.0f, 10.0f),
+      mBottomTop(-10.0f, 10.0f),
+      mNearFar(0.1f, 10.0f)  {
     mFOV = fov;
-    mDistance = distance;
+    mRadius = distance;
     mRotateSpeed = rotateSpeed;
     mZoomSpeed = zoomSpeed;
     mWorldUp = worldUp;
     mTarget = target;
-
     mYaw = PI_HALF;
     mPitch = 0.0f;
     updateVectors();
 }
 
 void
-Camera::Rotate(r32 dYaw, r32 dPitch, r32 dt) {
+OrbitalCamera::Rotate(r32 dYaw, r32 dPitch, r32 dt) {
     dYaw *= mRotateSpeed * dt;
     dPitch *= mRotateSpeed * dt;
 
@@ -39,7 +43,7 @@ Camera::Rotate(r32 dYaw, r32 dPitch, r32 dt) {
 }
 
 void
-Camera::Rotate(v2 diffs, r32 dt) {
+OrbitalCamera::Rotate(v2 diffs, r32 dt) {
     diffs *= mRotateSpeed * dt;
     r32 dYaw = diffs[0];
     r32 dPitch = diffs[1];
@@ -64,21 +68,25 @@ Camera::Rotate(v2 diffs, r32 dt) {
 }
 
 void
-Camera::Zoom(r32 dy, r32 dt)  {
+OrbitalCamera::Zoom(r32 dy, r32 dt)  {
     dy *= mZoomSpeed * dt;
-    mDistance -= dy;
-    if (mDistance <= 0.5f) {
-        mDistance = 0.5f;
+    mRadius -= dy;
+    if (mRadius <= 0.5f) {
+        mRadius = 0.5f;
     }
 
     updateVectors();
 }
 
 void
-Camera::updateVectors() {
-    mPosition.X = mDistance * COS(mYaw) * COS(mPitch);
-    mPosition.Y = -mDistance * SIN(mPitch);
-    mPosition.Z = mDistance * SIN(mYaw) * COS(mPitch);
+OrbitalCamera::updateVectors() {
+    // mPosition.X = mDistance * COS(mYaw) * COS(mPitch);
+    // mPosition.Y = -mDistance * SIN(mPitch);
+    // mPosition.Z = mDistance * SIN(mYaw) * COS(mPitch);
+    mPosition = v3(mTarget.X + mRadius * COS(mYaw) * COS(mPitch),
+        mTarget.Y + mRadius * SIN(mPitch),
+        mTarget.Z + mRadius * COS(mPitch) * SIN(mYaw));
+    
     mFront = (mTarget - mPosition).GetNormalized();
     mRight = (mFront ^ mWorldUp).GetNormalized();
     mUp = (mRight ^ mFront).GetNormalized();
@@ -88,7 +96,7 @@ Window::Window(u32 width, u32 height) : mSize(width, height) {;
     mSceneWindowFocused = false;
 }
 
-State::State(Camera *camera) 
+State::State(OrbitalCamera *camera) 
 : mWindow(800, 600),
  mFramebuffer(1920, 1080),
  mCamera(camera),
@@ -150,6 +158,7 @@ void
 UpdateAndRender(State *state) {
     const Input *CurrInput = &state->GetNewInput();
     const KeyboardController *NewKC = &CurrInput->mKeyboard;
+    OrbitalCamera *Camera = state->mCamera;
     if(NewKC->mChangeModel.mEndedDown && NewKC->mChangeModel.mHalfTransitionCount) {
         state->mShowBones = !state->mShowBones;
     }
@@ -157,18 +166,22 @@ UpdateAndRender(State *state) {
     const MouseController *MC = &CurrInput->mMouse;
     if(MC->mLeft.mEndedDown && state->mWindow.mSceneWindowFocused) {
         state->mPerspective = true;
-        state->mCamera->Rotate(CurrInput->mMouse.mCursorDiff, state->mDT);
+        Camera->Rotate(CurrInput->mMouse.mCursorDiff, state->mDT);
     }
 
     if(state->mWindow.mSceneWindowFocused) {
-        state->mCamera->Zoom(MC->mScrollOffset, state->mDT);
+        Camera->Zoom(MC->mScrollOffset, state->mDT);
     }
 
     // TODO(Jovan): Avoid calculating every frame if possible
     if(state->mPerspective) {
-        state->mProjection = Perspective(state->mCamera->mFOV, state->mFramebuffer.mSize.X / (r32) state->mFramebuffer.mSize.Y, 0.1f, 100.0f);
+        state->mProjection = Perspective(Camera->mFOV, state->mFramebuffer.mSize.X / (r32) state->mFramebuffer.mSize.Y, 0.1f, 100.0f);
     } else {
-        state->mProjection = Orthographic(-10.0f, 10.0f, -10.0f, 10.0f, 0.1f, 10.0f);
+        state->mProjection = Orthographic(Camera->mLeftRight.X, Camera->mLeftRight.Y,
+            Camera->mBottomTop.X,
+            Camera->mBottomTop.Y,
+            Camera->mNearFar.X,
+            Camera->mNearFar.Y);
     }
 
     state->UpdateModel();

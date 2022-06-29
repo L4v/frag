@@ -49,13 +49,13 @@ struct Input {
 
 // TODO(Jovan): In separate file?
 // TODO(Jovan): Panning?
-class Camera {
+class OrbitalCamera {
 public:
     r32         mFOV;
     r32         mPitch;
     r32         mYaw;
     r32         mRotateSpeed;
-    r32         mDistance;
+    r32         mRadius;
     r32         mZoomSpeed;
     v3          mWorldUp;
     v3          mPosition;
@@ -63,9 +63,12 @@ public:
     v3          mUp;
     v3          mRight;
     v3          mTarget;
+    v2          mLeftRight;
+    v2          mBottomTop;
+    v2          mNearFar;
 
     // NOTE(Jovan): Orbital camera constructor
-    Camera(r32 fov, r32 distance, r32 rotateSpeed = 1e-3f, r32 zoomSpeed = 1.0f, const v3 &worldUp = v3(0.0f, 1.0f, 0.0f), const v3 &target = v3(0.0f));
+    OrbitalCamera(r32 fov, r32 distance, r32 rotateSpeed = 1e-1f, r32 zoomSpeed = 1.0f, const v3 &worldUp = v3(0.0f, 1.0f, 0.0f), const v3 &target = v3(0.0f));
     void Rotate(r32 dYaw, r32 dPitch, r32 dt);
     void Rotate(v2 diffs, r32 dt);
     void Zoom(r32 dy, r32 dt);
@@ -83,7 +86,7 @@ private:
     GLTFModel     mMusclesModel;
 public:
     FramebufferGL mFramebuffer;
-    Camera       *mCamera;
+    OrbitalCamera       *mCamera;
     GLTFModel    *mCurrModel;
     Window        mWindow;
     m44           mProjection;
@@ -93,7 +96,7 @@ public:
     bool          mShowBones;
     bool          mPerspective;
 
-    State(Camera *camera);
+    State(OrbitalCamera *camera);
 
     void BeginFrame();
     void EndFrame();

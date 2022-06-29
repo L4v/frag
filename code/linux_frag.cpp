@@ -129,8 +129,8 @@ main() {
     glfwSwapInterval(1);
 
     // NOTE(Jovan): Camera init
-    Camera OrbitalCamera(45.0f, 2.0f);
-    State CurrState(&OrbitalCamera);
+    OrbitalCamera Camera(45.0f, 10.0f);
+    State CurrState(&Camera);
     FramebufferGL *Framebuffer = &CurrState.mFramebuffer;
     glBindFramebuffer(GL_FRAMEBUFFER, Framebuffer->mId);
     glfwSetWindowUserPointer(GLFWWindow, &CurrState);
@@ -145,8 +145,8 @@ main() {
     Shader RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
     Shader Debug("../shaders/debug.vert", "../shaders/debug.frag");
     
-    v3 ModelPosition = v3(0.0f, 4.0f, -8.0f);
-    v3 ModelRotation = v3(0.0f, 0.0f, 0.0f);
+    v3 ModelPosition = v3(0.0f);
+    v3 ModelRotation = v3(0.0f);
     v3 ModelScale    = v3(1.0f);
 
     u32 ModelVAO;
@@ -156,9 +156,9 @@ main() {
     std::vector<u32> Indices;
     std::vector<Texture> ModelTextures;
 
-    CurrState.mProjection = Perspective(OrbitalCamera.mFOV, Framebuffer->mSize.X / (r32) Framebuffer->mSize.Y, 0.1f, 100.0f);
+    CurrState.mProjection = Perspective(Camera.mFOV, Framebuffer->mSize.X / (r32) Framebuffer->mSize.Y, 0.1f, 100.0f);
     m44 View(1.0f);
-    View = LookAt(OrbitalCamera.mPosition, OrbitalCamera.mTarget, OrbitalCamera.mUp);
+    View = LookAt(Camera.mPosition, Camera.mTarget, Camera.mUp);
 
     // NOTE(Jovan): Set texture scale
     glUseProgram(Phong.mId);
@@ -207,17 +207,17 @@ main() {
         glUseProgram(Phong.mId);
 
         Phong.SetUniform4m("uProjection", CurrState.mProjection);
-        Phong.SetUniform3f("uViewPos", OrbitalCamera.mPosition);
+        Phong.SetUniform3f("uViewPos", Camera.mPosition);
 
         View.LoadIdentity();
-        View = LookAt(OrbitalCamera.mPosition, OrbitalCamera.mTarget, OrbitalCamera.mUp);
+        View = LookAt(Camera.mPosition, Camera.mTarget, Camera.mUp);
         Phong.SetUniform4m("uView", View);
 
         FramebufferGL::Bind(Framebuffer->mId, ClearColor, ClearMask, Framebuffer->mSize);
 
         glUseProgram(RiggedPhong.mId);
         RiggedPhong.SetUniform4m("uProjection", CurrState.mProjection);
-        RiggedPhong.SetUniform3f("uViewPos", OrbitalCamera.mPosition);
+        RiggedPhong.SetUniform3f("uViewPos", Camera.mPosition);
         RiggedPhong.SetUniform4m("uView", View);
         RiggedPhong.SetUniform1i("uDisplayBoneIdx", 0);
 
@@ -302,14 +302,20 @@ main() {
 
         // NOTE(Jovan): Camera window
         ImGui::Begin("Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::DragFloat3("Position", OrbitalCamera.mPosition.Values, 1e-3f);
-        ImGui::Spacing();
-        ImGui::DragFloat("FOV", &OrbitalCamera.mFOV, 1.0f, 15.0f, 120.0f, "%.1f");
-        ImGui::Spacing();
+        ImGui::DragFloat3("Position", Camera.mPosition.Values, 1e-3f);
         const char *ProjectionTypes[] = {"Perspective", "Orthographic"};
         ImGui::Combo("##Projection", &CurrentProjection, ProjectionTypes, 2);
-        ImGui::Text("Pitch: %.2f", OrbitalCamera.mPitch * DEG);
-        ImGui::Text("Yaw: %.2f", OrbitalCamera.mYaw * DEG);
+        if(CurrState.mPerspective) {
+            ImGui::Spacing();
+            ImGui::DragFloat("FOV", &Camera.mFOV, 1.0f, 15.0f, 120.0f, "%.1f");
+            ImGui::Spacing();
+            ImGui::Text("Pitch: %.2f", Camera.mPitch * DEG);
+            ImGui::Text("Yaw: %.2f", Camera.mYaw * DEG);
+        } else {
+            ImGui::DragFloat2("Left | Right", Camera.mLeftRight.Values);
+            ImGui::DragFloat2("Bottom | Top", Camera.mBottomTop.Values);
+            ImGui::DragFloat2("Near | Far", Camera.mNearFar.Values);
+        }
         ImGui::End();
 
         // NOTE(Jovan): Render UI
