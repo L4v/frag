@@ -792,12 +792,29 @@ inline v4 operator* (const v4 &v, const m44 &m) {
     return v4(v[0] * m[0] + v[1] * m[1] + v[2] * m[2] + v[3] * m[3]);
 } 
 
-inline m44 Perspective(r32 angleFOVY, r32 aspectRatio, r32 near, r32 far) {
+// NOTE(Jovan): Perspective projection
+inline m44
+Perspective(r32 angleFOVY, r32 aspectRatio, r32 near, r32 far) {
     r32 F = 1.0f / TAN((angleFOVY * RAD) / 2.0f);
     return m44(F / aspectRatio, 0.0f, 0.0f,                              0.0f,
               0.0f,                F, 0.0f,                              0.0f, 
               0.0f,             0.0f, (far + near) / (near - far),      -1.0f,
               0.0f,             0.0f, 2.0f * far * near / (near - far),  0.0f);
+}
+
+// NOTE(Jovan): Orthographic projection
+inline m44
+Orthographic(r32 left, r32 right, r32 bottom, r32 top, r32 near, r32 far) {
+    r32 SX = 2.0f / (left - right);
+    r32 SY = 2.0f / (top - bottom);
+    r32 SZ = 2.0f / (far - near);
+    r32 TX = -(right + left) / (right - left);
+    r32 TY = -(top + bottom) / (top - bottom);
+    r32 TZ = -(far + near) / (far - near);
+    return m44(SX,   0.0f, 0.0f, 0.0f,
+               0.0f, SY,   0.0f, 0.0f,
+               0.0f, 0.0f, SZ,   0.0f,
+               TX,   TY,   TZ,   1.0f);
 }
 
 static m44 LookAt(const v3 &eye, const v3 &center, const v3 &up) {

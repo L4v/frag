@@ -44,10 +44,12 @@ class GLTFModel {
     struct Animation {
         i32 mIdx;
         r64 mDurationInSeconds;
+        r32 mSpeed;
         std::map<i32, std::vector<i32>> mNodeToChannel;
         std::map<i32, AnimKeyframes> mJointKeyframes;
 
         Animation(i32 idx);
+        r64 GetAnimationTime(r64 timeInSeconds);
     };
 
     struct Node {
@@ -76,7 +78,6 @@ class GLTFModel {
     std::vector<Joint> mJoints;
     std::vector<Mesh> mMeshes;
     std::vector<Node> mNodes;
-    i32 mActiveAnimation;
     std::map<std::string, Texture> mTextures;
 
     std::vector<r32> LoadFloats(tinygltf::Model *tinyModel, i32 accessorIdx);
@@ -94,6 +95,8 @@ public:
     u32 mJointCount;
     u32 mVerticesCount;
     m44 mModelTransform;
+    Animation *mActiveAnimation;
+
     GLTFModel(const std::string &filePath);
     void Render(const Shader &program);
     void CalculateJointTransforms(std::vector<m44> &jointTransforms, r64 timeInSeconds);

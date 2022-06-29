@@ -6,9 +6,14 @@
 #include <string>
 #include <algorithm>
 
+
+#include "include/imgui/imgui.h"
+#include "include/imgui/imgui_internal.h"
+#include "include/imgui/imgui_impl_glfw.h"
+#include "include/imgui/imgui_impl_opengl3.h"
+
 #include "frag.hpp"
 #include "types.hpp"
-#include "ui.hpp"
 #include "shader.hpp"
 #include "model.hpp"
 
@@ -131,7 +136,10 @@ main() {
     glfwSetWindowUserPointer(GLFWWindow, &CurrState);
 
     // NOTE(Jovan): Init imgui
-    InitUI(GLFWWindow);
+    ImGui::CreateContext();
+    ImGui_ImplGlfw_InitForOpenGL(GLFWWindow, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     Shader Phong("../shaders/basic.vert", "../shaders/basic.frag");
     Shader RiggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
@@ -148,9 +156,9 @@ main() {
     std::vector<u32> Indices;
     std::vector<Texture> ModelTextures;
 
-    CurrState.mProjection = Perspective(CurrState.mCamera->mFOV, Framebuffer->mSize.X / (r32) Framebuffer->mSize.Y, 0.1f, 100.0f);
+    CurrState.mProjection = Perspective(OrbitalCamera.mFOV, Framebuffer->mSize.X / (r32) Framebuffer->mSize.Y, 0.1f, 100.0f);
     m44 View(1.0f);
-    View = LookAt(CurrState.mCamera->mPosition, CurrState.mCamera->mTarget, CurrState.mCamera->mUp);
+    View = LookAt(OrbitalCamera.mPosition, OrbitalCamera.mTarget, OrbitalCamera.mUp);
 
     // NOTE(Jovan): Set texture scale
     glUseProgram(Phong.mId);
@@ -174,80 +182,139 @@ main() {
     r32 StartTimeMillis = currentTimeInMillis();
     r32 EndTimeMillis = currentTimeInMillis();
     r32 BeginTimeMillis = currentTimeInMillis();
-    r32 RunningTimeSec = currentTimeInSeconds();
+    // r32 RunningTimeSec = currentTimeInSeconds();
+    CurrState.mCurrentTimeInSeconds = currentTimeInSeconds();
     CurrState.mDT = EndTimeMillis - StartTimeMillis;
 
     ImGuiWindowFlags MainWindowFlags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar
         | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus
         | ImGuiWindowFlags_NoFocusOnAppearing;
-    MainWindow Main("Main", MainWindowFlags);
-    SceneWindow Scene("Scene", ImGuiWindowFlags_AlwaysAutoResize);
-    ModelWindow ModelWindow("Model", ImGuiWindowFlags_AlwaysAutoResize);
+    bool IsMainWindowInitialized = false;
+    const std::string MainWindowName = "Main";
+    const std::string SceneWindowName = "Scene";
+    const std::string ModelWindowName = "Model";
+    i32 CurrentProjection = 0;
 
     glEnable(GL_TEXTURE_2D);
     GLbitfield ClearMask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
     v4 ClearColor(0x34 / (r32) 255, 0x49 / (r32) 255, 0x5e / (r32) 255, 1.0f);
     while(!glfwWindowShouldClose(GLFWWindow)) {
         StartTimeMillis = currentTimeInMillis();
-        RunningTimeSec = (currentTimeInMillis() - BeginTimeMillis) / 1000.0f;
+        CurrState.mCurrentTimeInSeconds = (currentTimeInMillis() - BeginTimeMillis) / 1000.0f;
         CurrState.BeginFrame();
         glfwPollEvents();
         
         glUseProgram(Phong.mId);
-        if(Scene.mHasResized) {
-            CurrState.mProjection = Perspective(CurrState.mCamera->mFOV, Framebuffer->mSize.X / (r32) Framebuffer->mSize.Y, 0.1f, 100.0f);
-            Scene.mHasResized = false;
-        }
 
         Phong.SetUniform4m("uProjection", CurrState.mProjection);
-        Phong.SetUniform3f("uViewPos", CurrState.mCamera->mPosition);
+        Phong.SetUniform3f("uViewPos", OrbitalCamera.mPosition);
 
         View.LoadIdentity();
-        View = LookAt(CurrState.mCamera->mPosition, CurrState.mCamera->mTarget, CurrState.mCamera->mUp);
+        View = LookAt(OrbitalCamera.mPosition, OrbitalCamera.mTarget, OrbitalCamera.mUp);
         Phong.SetUniform4m("uView", View);
 
         FramebufferGL::Bind(Framebuffer->mId, ClearColor, ClearMask, Framebuffer->mSize);
 
         glUseProgram(RiggedPhong.mId);
         RiggedPhong.SetUniform4m("uProjection", CurrState.mProjection);
-        RiggedPhong.SetUniform3f("uViewPos", CurrState.mCamera->mPosition);
+        RiggedPhong.SetUniform3f("uViewPos", OrbitalCamera.mPosition);
         RiggedPhong.SetUniform4m("uView", View);
         RiggedPhong.SetUniform1i("uDisplayBoneIdx", 0);
 
         // NOTE(Jovan): Render model
+        CurrState.mPerspective = CurrentProjection == 0;
         UpdateAndRender(&CurrState);
         std::vector<m44> BoneTransforms;
-        CurrState.mCurrModel->CalculateJointTransforms(BoneTransforms, RunningTimeSec);
-        for(u32 i = 0; i < BoneTransforms.size(); ++i) {
-            RiggedPhong.SetUniform4m("uBones[" + std::to_string(i) + "]", BoneTransforms[i]);
-        }
+        GLTFModel *CurrModel = CurrState.mCurrModel;
+        CurrModel->CalculateJointTransforms(BoneTransforms, CurrState.mCurrentTimeInSeconds);
+        RiggedPhong.SetUniform4m("uBones", BoneTransforms);
 
         
-        CurrState.mCurrModel->mModelTransform
+        CurrModel->mModelTransform
             .LoadIdentity()
             .Translate(ModelPosition)
             .Rotate(quat(v3(1.0f, 0.0f, 0.0f), ModelRotation.X))
             .Rotate(quat(v3(0.0f, 1.0f, 0.0f), ModelRotation.Y))
             .Rotate(quat(v3(0.0f, 0.0f, 1.0f), ModelRotation.Z))
             .Scale(ModelScale);
-        CurrState.mCurrModel->Render(RiggedPhong);
+        CurrModel->Render(RiggedPhong);
 
         FramebufferGL::Bind(0, ClearColor, ClearMask, CurrState.mWindow.mSize);
         glUseProgram(0);
 
-        NewFrameUI();
+        // NOTE(Jovan): UI RENDERING ========================================
+        // NOTE(Jovan): New frame UI
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
 
-        Main.Render(&CurrState, CurrState.mWindow.mSize.X, CurrState.mWindow.mSize.Y);
-        Scene.Render(&CurrState);
-        ModelWindow.Render(&CurrState, CurrState.mCurrModel->mFilePath, &ModelPosition[0], &ModelRotation[0] ,&ModelScale[0], CurrState.mCurrModel->mVerticesCount);
+        // NOTE(Jovan): Main window
+        ImVec2 Size(CurrState.mWindow.mSize.X, CurrState.mWindow.mSize.Y);
+        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+        ImGui::SetNextWindowSize(Size);
+        ImGui::Begin(MainWindowName.c_str(), NULL, MainWindowFlags);
+        ImVec2 Pos(0.0f, 0.0f);
+        ImGuiID DockID = ImGui::GetID("DockSpace");
+        ImGui::DockSpace(DockID);
 
-        ImGui::Begin("Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::Text("Position: %.2f, %.2f, %.2f", CurrState.mCamera->mPosition.X, CurrState.mCamera->mPosition.Y, CurrState.mCamera->mPosition.Z);
-        ImGui::Text("Pitch: %.2f", CurrState.mCamera->mPitch * 180.0f / PI);
-        ImGui::Text("Yaw: %.2f", CurrState.mCamera->mYaw * 180.0f / PI);
+        if (!IsMainWindowInitialized) {
+            ImGui::DockBuilderRemoveNode(DockID);
+            ImGui::DockBuilderAddNode(DockID, ImGuiDockNodeFlags_DockSpace);
+            ImGui::DockBuilderSetNodeSize(DockID, Size);
+            ImGuiID LeftID = ImGui::DockBuilderSplitNode(DockID, ImGuiDir_Left, 0.5, NULL, &DockID);
+            ImGuiID BottomID = ImGui::DockBuilderSplitNode(LeftID, ImGuiDir_Down, 0.5f, NULL, &LeftID);
+            ImGui::DockBuilderDockWindow("Model", LeftID);
+            ImGui::DockBuilderDockWindow("Camera", BottomID);
+            ImGui::DockBuilderDockWindow("Scene",  DockID);
+            ImGui::DockBuilderFinish(DockID);
+            IsMainWindowInitialized = true;
+        }
+
         ImGui::End();
 
-        RenderUI();
+        // NOTE(Jovan): Scene window
+        ImGui::Begin(SceneWindowName.c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize); {
+            ImGui::BeginChild("SceneRender");
+            CurrState.mWindow.mSceneWindowFocused = ImGui::IsWindowFocused();
+
+            ImVec2 WindowSize = ImGui::GetWindowSize();
+            if (CurrState.mFramebuffer.mSize.X != WindowSize.x || CurrState.mFramebuffer.mSize.Y != WindowSize.y) {
+                CurrState.mFramebuffer.Resize(WindowSize.x, WindowSize.y);
+            }
+
+            ImGui::Image((ImTextureID)CurrState.mFramebuffer.mTexture, WindowSize, ImVec2(0, 1), ImVec2(1, 0));
+            ImGui::EndChild();
+        } ImGui::End();
+
+        // NOTE(Jovan): Model window
+        ImGui::Begin(ModelWindowName.c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::Text("Loaded model: %s", CurrModel->mFilePath.c_str());
+        ImGui::Checkbox("Show bones", &CurrState.mShowBones);
+        ImGui::Spacing();
+        ImGui::DragFloat3("Position", ModelPosition.Values, 1e-3f);
+        ImGui::DragFloat3("Rotation", ModelRotation.Values, 1e-1f);
+        ImGui::DragFloat3("Scale", ModelScale.Values, 1e-3f);
+        ImGui::Spacing();
+        ImGui::Text("Vertices: %d", CurrModel->mVerticesCount);
+        ImGui::Spacing();
+        ImGui::SliderFloat("Animation speed", &CurrModel->mActiveAnimation->mSpeed, 1e-2f, 4.0f, "%.2f");
+        ImGui::End();
+
+        // NOTE(Jovan): Camera window
+        ImGui::Begin("Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::DragFloat3("Position", OrbitalCamera.mPosition.Values, 1e-3f);
+        ImGui::Spacing();
+        ImGui::DragFloat("FOV", &OrbitalCamera.mFOV, 1.0f, 15.0f, 120.0f, "%.1f");
+        ImGui::Spacing();
+        const char *ProjectionTypes[] = {"Perspective", "Orthographic"};
+        ImGui::Combo("##Projection", &CurrentProjection, ProjectionTypes, 2);
+        ImGui::Text("Pitch: %.2f", OrbitalCamera.mPitch * DEG);
+        ImGui::Text("Yaw: %.2f", OrbitalCamera.mYaw * DEG);
+        ImGui::End();
+
+        // NOTE(Jovan): Render UI
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         CurrState.EndFrame();
         EndTimeMillis = currentTimeInMillis();
@@ -256,7 +323,11 @@ main() {
         glfwSwapBuffers(GLFWWindow);
     }
 
-    DisposeUI();
+    // NOTE(Jovan): Dispose UI
+    ImGui_ImplGlfw_Shutdown();
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui::DestroyContext();
+
     glfwDestroyWindow(GLFWWindow);
     glfwTerminate();
     return 0;

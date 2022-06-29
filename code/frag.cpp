@@ -1,4 +1,5 @@
 #include "frag.hpp"
+#include "math3d.hpp"
 
 Camera::Camera(r32 fov, r32 distance, r32 rotateSpeed, r32 zoomSpeed, const v3 &worldUp, const v3 &target)  {
     mFOV = fov;
@@ -100,6 +101,7 @@ State::State(Camera *camera)
     mDT = 0.0f;
     mImGUIInitialized = false;
     mShowBones = true;
+    mPerspective = false;
 }
 
 Input&
@@ -154,11 +156,19 @@ UpdateAndRender(State *state) {
 
     const MouseController *MC = &CurrInput->mMouse;
     if(MC->mLeft.mEndedDown && state->mWindow.mSceneWindowFocused) {
+        state->mPerspective = true;
         state->mCamera->Rotate(CurrInput->mMouse.mCursorDiff, state->mDT);
     }
 
     if(state->mWindow.mSceneWindowFocused) {
         state->mCamera->Zoom(MC->mScrollOffset, state->mDT);
+    }
+
+    // TODO(Jovan): Avoid calculating every frame if possible
+    if(state->mPerspective) {
+        state->mProjection = Perspective(state->mCamera->mFOV, state->mFramebuffer.mSize.X / (r32) state->mFramebuffer.mSize.Y, 0.1f, 100.0f);
+    } else {
+        state->mProjection = Orthographic(-10.0f, 10.0f, -10.0f, 10.0f, 0.1f, 10.0f);
     }
 
     state->UpdateModel();

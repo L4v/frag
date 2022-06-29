@@ -110,6 +110,12 @@ GLTFModel::AnimKeyframes::Load(const std::string &path, u32 count, const r32 *ti
 GLTFModel::Animation::Animation(i32 idx) {
     mIdx = idx;
     mDurationInSeconds = 0.0f;
+    mSpeed = 1.0f;
+}
+
+r64
+GLTFModel::Animation::GetAnimationTime(r64 timeInSeconds) {
+    return fmod(timeInSeconds * mSpeed, mDurationInSeconds);
 }
 
 GLTFModel::GLTFModel(const std::string &filePath) {
@@ -206,6 +212,7 @@ GLTFModel::loadJointsFromNodes(tinygltf::Model *tinyModel, const tinygltf::Skin 
 
 void
 GLTFModel::loadAnimations(tinygltf::Model *tinyModel) {
+    mActiveAnimation = 0;
     for(u32 AnimIdx = 0; AnimIdx < tinyModel->animations.size(); ++AnimIdx) {
         const tinygltf::Animation &TinyAnimation = tinyModel->animations[AnimIdx];
         Animation CurrAnim = Animation(AnimIdx);
@@ -242,7 +249,7 @@ GLTFModel::loadAnimations(tinygltf::Model *tinyModel) {
         }
         mAnimations.push_back(CurrAnim);
     }
-    mActiveAnimation = tinyModel->animations.size() > 0 ? 0 : -1;
+    mActiveAnimation = tinyModel->animations.empty() ? 0 : &mAnimations[0];
 }
 
 void
@@ -253,15 +260,14 @@ GLTFModel::CalculateJointTransforms(std::vector<m44> &jointTransforms, r64 timeI
 
     for(u32 i = 0; i < mJoints.size(); ++i) {
         const Joint &J = mJoints[i];
-        if(mAnimations.size() > 0) {
-            Animation &CurrAnim = mAnimations[mActiveAnimation];
-            std::map<i32, AnimKeyframes>::iterator KeyframesIt = CurrAnim.mJointKeyframes.find(J.mIdx);
-            if(KeyframesIt != CurrAnim.mJointKeyframes.end()) {
+        if(!mAnimations.empty()) {
+            std::map<i32, AnimKeyframes>::iterator KeyframesIt = mActiveAnimation->mJointKeyframes.find(J.mIdx);
+            if(KeyframesIt != mActiveAnimation->mJointKeyframes.end()) {
                 AnimKeyframes K = KeyframesIt->second;
                 m44 T(1.0);
                 m44 R(1.0);
                 m44 S(1.0);
-                r64 clampedTimeInSeconds = fmod(timeInSeconds, CurrAnim.mDurationInSeconds);
+                r64 clampedTimeInSeconds = mActiveAnimation->GetAnimationTime(timeInSeconds);
 
                 if(K.mTranslation.mCount > 0) {
                     T.Translate(K.mTranslation.Interpolate(clampedTimeInSeconds));

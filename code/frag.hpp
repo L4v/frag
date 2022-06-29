@@ -88,8 +88,10 @@ public:
     Window        mWindow;
     m44           mProjection;
     r32           mDT;
+    r32           mCurrentTimeInSeconds;
     bool          mImGUIInitialized;
     bool          mShowBones;
+    bool          mPerspective;
 
     State(Camera *camera);
 
