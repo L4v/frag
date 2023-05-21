@@ -15,7 +15,7 @@ CC       = g++
 CFLAGS   = -I$(SOURCE_DIR)/include -g
 CFLAGS  += -DIMGUI_IMPL_OPENGL_LOADER_GLAD
 LDFLAGS  = -ldl
-LDFLAGS += `pkg-config --libs glfw3`
+LDFLAGS += `pkg-config --libs glfw3 assimp`
 
 
 $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.cpp
