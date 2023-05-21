@@ -53,6 +53,7 @@ class GLTFModel {
     };
 
     struct Node {
+        Node(const tinygltf::Node& node, i32 nodeIdx, i32 parentIdx, const m44& localTransform, const m44& parentTransform);
         i32 mIdx;
         i32 mParentIdx;
         std::string mName;
@@ -62,11 +63,12 @@ class GLTFModel {
     };
 
     struct Joint {
+        Joint(const GLTFModel::Node& node, i32 skinJointIdx, const m44& inverseBindPoseTransform);
         i32 mIdx;
         i32 mParentIdx;
         std::string mName;
         m44 mLocalTransform;
-        m44 mInverseBindTransform;
+        m44 mInverseBindPoseTransform;
     };
 
     std::vector<u8> mData;
@@ -80,11 +82,12 @@ class GLTFModel {
     std::vector<Node> mNodes;
     std::map<std::string, Texture> mTextures;
 
-    std::vector<r32> LoadFloats(tinygltf::Model *tinyModel, i32 accessorIdx);
-    std::vector<u32> LoadIndices(tinygltf::Model *tinyModel, i32 accessorIdx);
+    void loadFloats(tinygltf::Model *tinyModel, i32 accessorIdx, std::vector<r32>& out);
+    void loadIndices(tinygltf::Model *tinyModel, i32 accessorIdx, std::vector<u32>& out);
     m44 getLocalTransform(const tinygltf::Node &node);
-    void loadModel(tinygltf::Model *tinyModel, const std::string &filePath);
+    void loadData(tinygltf::Model *tinyModel, const std::string &filePath);
     void loadNodes(tinygltf::Model *tinyModel);
+    void loadMeshVertices(tinygltf::Model* tinyModel, std::map<std::string, int>& attributes, std::vector<Mesh::Vertex>& outVertices);
     void loadMesh(tinygltf::Model *tinyModel, u32 meshIdx);
     void loadJointsFromNodes(tinygltf::Model *tinyModel, const tinygltf::Skin &skin);
     void loadAnimations(tinygltf::Model *tinyModel);

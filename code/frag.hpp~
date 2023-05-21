@@ -68,7 +68,7 @@ public:
     v2          mNearFar;
 
     // NOTE(Jovan): Orbital camera constructor
-    OrbitalCamera(r32 fov, r32 distance, r32 rotateSpeed = 1e-2f, r32 zoomSpeed = 1.0f, const v3 &worldUp = v3(0.0f, 1.0f, 0.0f), const v3 &target = v3(0.0f));
+    OrbitalCamera(r32 fov, r32 distance, r32 rotateSpeed = 1e-1f, r32 zoomSpeed = 1.0f, const v3 &worldUp = v3(0.0f, 1.0f, 0.0f), const v3 &target = v3(0.0f));
     void Rotate(r32 dYaw, r32 dPitch, r32 dt);
     void Rotate(v2 diffs, r32 dt);
     void Zoom(r32 dy, r32 dt);

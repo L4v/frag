@@ -18,8 +18,8 @@ public:
     };
 
     struct Material {
-        i32 mDiffuseId = -1;
-        i32 mSpecularId = -1;
+        i32 mDiffuseId;
+        i32 mSpecularId;
     };
 
     Material mMaterial;

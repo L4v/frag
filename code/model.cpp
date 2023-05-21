@@ -118,16 +118,34 @@ GLTFModel::Animation::GetAnimationTime(r64 timeInSeconds) {
     return fmod(timeInSeconds * mSpeed, mDurationInSeconds);
 }
 
+GLTFModel::Node::Node(const tinygltf::Node& node, i32 nodeIdx, i32 parentIdx, const m44& localTransform, const m44& parentTransform) {
+    mIdx = nodeIdx;
+    mParentIdx = parentIdx;
+    mLocalTransform = localTransform;
+    mGlobalTransform = mLocalTransform * parentTransform;
+    if(!node.name.empty()) {
+        mName = node.name;
+    }
+}
+
+GLTFModel::Joint::Joint(const GLTFModel::Node& node, i32 skinJointIdx, const m44& inverseBindPoseTransform) {
+    mParentIdx = -1;
+    mIdx = skinJointIdx;
+    mName = node.mName;
+    mLocalTransform = node.mLocalTransform;
+    mInverseBindPoseTransform = inverseBindPoseTransform;
+}
+
 GLTFModel::GLTFModel(const std::string &filePath) {
     mModelTransform.LoadIdentity();
     tinygltf::Model tinyModel;
-    loadModel(&tinyModel, filePath);
+    loadData(&tinyModel, filePath);
     loadNodes(&tinyModel);
     loadAnimations(&tinyModel);
 }
 
 void
-GLTFModel::loadModel(tinygltf::Model *tinyModel, const std::string &filePath) {
+GLTFModel::loadData(tinygltf::Model *tinyModel, const std::string &filePath) {
     mFilePath = filePath;
     std::string fileExtension = filePath.substr(filePath.find_last_of(".") + 1, filePath.length());
     tinygltf::TinyGLTF Loader;
@@ -135,11 +153,9 @@ GLTFModel::loadModel(tinygltf::Model *tinyModel, const std::string &filePath) {
     std::string Warn;
     bool Ret = false;
 
-    if(fileExtension == "gltf") {
-        Ret = Loader.LoadASCIIFromFile(tinyModel, &Err, &Warn, filePath);
-    } else {
-        Ret = Loader.LoadBinaryFromFile(tinyModel, &Err, &Warn, filePath);
-    }
+    Ret = fileExtension == "gltf"
+        ? Loader.LoadASCIIFromFile(tinyModel, &Err, &Warn, filePath)
+        : Loader.LoadBinaryFromFile(tinyModel, &Err, &Warn, filePath);
 
     if(!Err.empty()) {
         std::cerr << "Error: " << Err << std::endl;
@@ -152,7 +168,7 @@ GLTFModel::loadModel(tinygltf::Model *tinyModel, const std::string &filePath) {
     }
 
     if(!Ret) {
-        std::cerr << "Error: Failed to load model" << std::endl;
+        std::cerr << "Error: Failed to load data" << std::endl;
         return;
     }
 
@@ -163,37 +179,49 @@ GLTFModel::loadModel(tinygltf::Model *tinyModel, const std::string &filePath) {
 
 void
 GLTFModel::loadNodes(tinygltf::Model *tinyModel) {
-        // NOTE(Jovan): Load all inverse bind pose matrices
-        const tinygltf::Skin &Skin = tinyModel->skins[0];
-        std::vector<r32> InverseBindPoseReals = LoadFloats(tinyModel, Skin.inverseBindMatrices);
+    const tinygltf::Skin &Skin = tinyModel->skins[0];
+    std::vector<r32> InverseBindPoseReals;
+    loadFloats(tinyModel, Skin.inverseBindMatrices, InverseBindPoseReals);
 
-        for(u32 i = 0; i < InverseBindPoseReals.size(); i += 16) {
-            m44 InverseBindPose = m44(InverseBindPoseReals.data() + i);
-            mInverseBindPoseMatrices.push_back(InverseBindPose);
-        }
+    for(u32 i = 0; i < InverseBindPoseReals.size(); i += 16) {
+        m44 InverseBindPose = m44(InverseBindPoseReals.data() + i);
+        mInverseBindPoseMatrices.push_back(InverseBindPose);
+    }
 
-        for(i32 NodeIdx : tinyModel->scenes[0].nodes) {
-            traverseNodes(tinyModel, NodeIdx, -1, m44(1.0f));
-        }
+    for(i32 NodeIdx : tinyModel->scenes[0].nodes) {
+        traverseNodes(tinyModel, NodeIdx, -1, m44(1.0f));
+    }
 
-        loadJointsFromNodes(tinyModel, Skin);
+    loadJointsFromNodes(tinyModel, Skin);
+}
+
+void
+GLTFModel::traverseNodes(tinygltf::Model *tinyModel, i32 nodeIdx, i32 parentIdx, const m44 &parentTransform) {
+    const tinygltf::Node TinyNode = tinyModel->nodes[nodeIdx];
+    Node N(TinyNode, nodeIdx, parentIdx, getLocalTransform(TinyNode), parentTransform);
+    
+    mNodeToNodeIdx[nodeIdx] = mNodes.size();
+    mNodes.push_back(N);
+
+    if(TinyNode.mesh >= 0) {
+        mInverseGlobalTransform = ~N.mGlobalTransform;
+        loadMesh(tinyModel, TinyNode.mesh);
+    }
+
+    for(i32 ChildIdx : TinyNode.children) {
+        N.mChildren.push_back(ChildIdx);
+        traverseNodes(tinyModel, ChildIdx, nodeIdx, N.mGlobalTransform);
+    }
 }
 
 void
 GLTFModel::loadJointsFromNodes(tinygltf::Model *tinyModel, const tinygltf::Skin &skin) {
-    // NOTE(Jovan): Get all joints
     for(u32 i = 0; i < skin.joints.size(); ++i) {
         i32 SkinJointIdx = skin.joints[i];
         i32 NodeIdx = mNodeToNodeIdx[SkinJointIdx];
         const Node &N = mNodes[NodeIdx];
         mNodeToJointIdx[SkinJointIdx] = mJoints.size();
-
-        Joint J;
-        J.mParentIdx = -1;
-        J.mIdx = SkinJointIdx;
-        J.mName = N.mName;
-        J.mLocalTransform = N.mLocalTransform;
-        J.mInverseBindTransform = mInverseBindPoseMatrices[i];
+        Joint J(N, SkinJointIdx, mInverseBindPoseMatrices[i]);
 
         if(mNodeToJointIdx.find(N.mParentIdx) != mNodeToJointIdx.end()) {
             J.mParentIdx = N.mParentIdx;
@@ -201,10 +229,10 @@ GLTFModel::loadJointsFromNodes(tinygltf::Model *tinyModel, const tinygltf::Skin 
 
         mJoints.push_back(J);
     }
+
     mJointCount = mJoints.size();
 
     assert(mJoints.size() <= tinyModel->nodes.size());
-
     for(u32 i = 0; i < skin.joints.size(); ++i) {
         assert(mNodeToJointIdx[skin.joints[i]] == i);
     }
@@ -231,8 +259,10 @@ GLTFModel::loadAnimations(tinygltf::Model *tinyModel) {
                     const tinygltf::AnimationSampler &Sampler = TinyAnimation.samplers[Channel.sampler];
                     const tinygltf::Accessor &Input = tinyModel->accessors[Sampler.input];
                     const tinygltf::Accessor &Output = tinyModel->accessors[Sampler.output];
-                    const std::vector<r32> Times = LoadFloats(tinyModel, Sampler.input);
-                    const std::vector<r32> Values = LoadFloats(tinyModel, Sampler.output);
+                    std::vector<r32> Times;
+                    loadFloats(tinyModel, Sampler.input, Times);
+                    std::vector<r32> Values;
+                    loadFloats(tinyModel, Sampler.output, Values);
                     const std::string &Path = Channel.target_path;
                     std::map<i32, AnimKeyframes>::iterator KeyframesIt = CurrAnim.mJointKeyframes.find(J.mIdx);
 
@@ -297,33 +327,29 @@ GLTFModel::CalculateJointTransforms(std::vector<m44> &jointTransforms, r64 timeI
 
     for(u32 i = 0; i < mJoints.size(); ++i) {
         const Joint &J = mJoints[i];
-        jointTransforms[i] = J.mInverseBindTransform * GlobalJointTransforms[i];
+        jointTransforms[i] = J.mInverseBindPoseTransform * GlobalJointTransforms[i];
         jointTransforms[i] = jointTransforms[i] * mInverseGlobalTransform;
     }
 }
 
 m44
 GLTFModel::getLocalTransform(const tinygltf::Node &node) {
-    v3 TranslationVec(0.0f);
-    quat RotationQuat(1.0f, 0.0f, 0.0f, 0.0f);
-    v3 ScaleVec(1.0f);
     m44 LocalTransform(1.0f);
-
-    if(node.translation.size() > 0) {
-        TranslationVec = v3(node.translation.data());
-    }
-
-    if(node.rotation.size() > 0) {
-        memcpy(&RotationQuat, node.rotation.data(), 4 * sizeof(r32));
-    }
-
-    if(node.scale.size() > 0) {
-        ScaleVec = v3(node.scale.data());
-    }
-
     if(node.matrix.size() > 0) {
         LocalTransform = m44(node.matrix.data());
     } else {
+        v3 TranslationVec = node.translation.size() > 0
+            ? v3(node.translation.data())
+            : v3(0.0f);
+
+        v3 ScaleVec = node.scale.size() > 0
+            ? v3(node.scale.data())
+            : v3(1.0f);
+
+        quat RotationQuat(1.0f, 0.0f, 0.0f, 0.0f);
+        if(node.rotation.size() > 0) {
+            memcpy(&RotationQuat, node.rotation.data(), 4 * sizeof(r32));
+        }
         m44 T = m44(1.0f).Translate(TranslationVec);
         m44 R(RotationQuat);
         m44 S = m44(1.0f).Scale(ScaleVec);
@@ -342,79 +368,65 @@ GLTFModel::Render(const Shader &program) {
 }
 
 void
+GLTFModel::loadMeshVertices(tinygltf::Model* tinyModel, std::map<std::string, int>& attributes, std::vector<Mesh::Vertex>& outVertices) {
+    u32 PositionAccessorIdx = attributes["POSITION"];
+    u32 NormalAccessorIdx = attributes["NORMAL"];
+    u32 TexCoordsAccessorIdx = attributes["TEXCOORD_0"];
+    u32 JointsAccessorIdx = attributes["JOINTS_0"];
+    u32 WeightsAccessorIdx = attributes["WEIGHTS_0"];
+    
+    std::vector<r32> Positions;
+    loadFloats(tinyModel, PositionAccessorIdx, Positions);
+    std::vector<r32> Normals;
+    loadFloats(tinyModel, NormalAccessorIdx, Normals);
+    std::vector<r32> TexCoords;
+    loadFloats(tinyModel, TexCoordsAccessorIdx, TexCoords);
+    std::vector<u32> Joints;
+    loadIndices(tinyModel, JointsAccessorIdx, Joints);
+    std::vector<r32> Weights;
+    loadFloats(tinyModel, WeightsAccessorIdx, Weights);
+
+    for(u32 i = 0, j = 0, k = 0; i < Positions.size(); i += 3, j += 4, k += 2) {
+        outVertices.push_back(Mesh::Vertex(&Positions[i], &Normals[i], &TexCoords[k], &Joints[j], &Weights[j]));
+    }
+}
+
+void
 GLTFModel::loadMesh(tinygltf::Model *tinyModel, u32 meshIdx) {
     tinygltf::Mesh &TinyMesh = tinyModel->meshes[meshIdx];
     tinygltf::Primitive &Primitive0 = TinyMesh.primitives[0];
-    tinygltf::Material &TinyMaterial = tinyModel->materials[Primitive0.material];
+
     auto &Attributes = Primitive0.attributes;
-    u32 IndexAccessordIdx = Primitive0.indices;
-    u32 PositionAccessorIdx = Attributes["POSITION"];
-    u32 NormalAccessorIdx = Attributes["NORMAL"];
-    u32 TexCoordsAccessorIdx = Attributes["TEXCOORD_0"];
-    u32 JointsAccessorIdx = Attributes["JOINTS_0"];
-    u32 WeightsAccessorIdx = Attributes["WEIGHTS_0"];
-
-
     std::vector<Mesh::Vertex> Vertices;
-    std::vector<r32> Positions = LoadFloats(tinyModel, PositionAccessorIdx);
-    std::vector<r32> Normals = LoadFloats(tinyModel, NormalAccessorIdx);
-    std::vector<r32> TexCoords = LoadFloats(tinyModel, TexCoordsAccessorIdx);
-    std::vector<u32> Indices = LoadIndices(tinyModel, IndexAccessordIdx);
-    std::vector<u32> Joints = LoadIndices(tinyModel, JointsAccessorIdx);
-    std::vector<r32> Weights = LoadFloats(tinyModel, WeightsAccessorIdx);
-
-    for(u32 i = 0, j = 0, k = 0; i < Positions.size(); i += 3, j += 4, k += 2) {
-        Vertices.push_back(Mesh::Vertex(&Positions[i], &Normals[i], &TexCoords[k], &Joints[j], &Weights[j]));
-    }
+    loadMeshVertices(tinyModel, Attributes, Vertices);
     mVerticesCount = Vertices.size();
+
+    u32 IndexAccessordIdx = Primitive0.indices;
+    std::vector<u32> Indices;
+    loadIndices(tinyModel, IndexAccessordIdx, Indices);
 
     Mesh NewMesh(Vertices, Indices);
     
+    tinygltf::Material &TinyMaterial = tinyModel->materials[Primitive0.material];
     tinygltf::TextureInfo &TexInfo = TinyMaterial.pbrMetallicRoughness.baseColorTexture;
-        tinygltf::Texture &TinyTexture = tinyModel->textures[TexInfo.index];
-        std::map<std::string, Texture>::const_iterator TexIt = mTextures.find(TinyTexture.name);
+    tinygltf::Texture &TinyTexture = tinyModel->textures[TexInfo.index];
+    std::map<std::string, Texture>::const_iterator TexIt = mTextures.find(TinyTexture.name);
 
-        if(TexIt == mTextures.end()) {
-            tinygltf::Image &TinyImage = tinyModel->images[TinyTexture.source];
-            Texture Tex(TinyImage.width, TinyImage.height, TinyImage.image.data());
-            mTextures[TinyTexture.name] = Tex;
-            NewMesh.mMaterial.mDiffuseId = Tex.mId;
-        } else {
-            NewMesh.mMaterial.mDiffuseId = TexIt->second.mId;
-        }
+    if(TexIt == mTextures.end()) {
+        tinygltf::Image &TinyImage = tinyModel->images[TinyTexture.source];
+        Texture Tex(TinyImage.width, TinyImage.height, TinyImage.image.data());
+        mTextures[TinyTexture.name] = Tex;
+        NewMesh.mMaterial.mDiffuseId = Tex.mId;
+    } else {
+        NewMesh.mMaterial.mDiffuseId = TexIt->second.mId;
+    }
 
     mMeshes.push_back(NewMesh);
 }
 
 void
-GLTFModel::traverseNodes(tinygltf::Model *tinyModel, i32 nodeIdx, i32 parentIdx, const m44 &parentTransform) {
-    const tinygltf::Node CurrNode = tinyModel->nodes[nodeIdx];
-    Node N;
-    N.mIdx = nodeIdx;
-    N.mParentIdx = parentIdx;
-    N.mLocalTransform = getLocalTransform(CurrNode);
-    N.mGlobalTransform = N.mLocalTransform * parentTransform; //parentTransform * N.mLocalTransform; // T?
-    if(!CurrNode.name.empty()) {
-        N.mName = CurrNode.name;
-    }
-    mNodeToNodeIdx[nodeIdx] = mNodes.size();
-    mNodes.push_back(N);
-
-    if(CurrNode.mesh >= 0) {
-        mInverseGlobalTransform = ~N.mGlobalTransform;
-        loadMesh(tinyModel, CurrNode.mesh);
-    }
-
-    for(i32 ChildIdx : CurrNode.children) {
-        N.mChildren.push_back(ChildIdx);
-        traverseNodes(tinyModel, ChildIdx, nodeIdx, N.mGlobalTransform);
-    }
-}
-
-std::vector<r32>
-GLTFModel::LoadFloats(tinygltf::Model *tinyModel, i32 accessorIdx) {
+GLTFModel::loadFloats(tinygltf::Model *tinyModel, i32 accessorIdx, std::vector<r32>& out) {
     const tinygltf::Accessor &Accessor = tinyModel->accessors[accessorIdx];
-    std::vector<r32> RetVal;
     u32 Offset = tinyModel->bufferViews[Accessor.bufferView].byteOffset + Accessor.byteOffset;
     u32 NumPerVert;
     switch(Accessor.type) {
@@ -429,16 +441,13 @@ GLTFModel::LoadFloats(tinygltf::Model *tinyModel, i32 accessorIdx) {
     }
     
     size_t DataSize = Accessor.count * NumPerVert * sizeof(r32);
-    RetVal.resize(DataSize);
-    memcpy(RetVal.data(), mData.data() + Offset, DataSize);
-
-    return RetVal;
+    out.resize(DataSize);
+    memcpy(out.data(), mData.data() + Offset, DataSize);
 }
 
-std::vector<u32>
-GLTFModel::LoadIndices(tinygltf::Model *tinyModel, i32 accessorIdx) {
+void
+GLTFModel::loadIndices(tinygltf::Model *tinyModel, i32 accessorIdx, std::vector<u32>& out) {
     const tinygltf::Accessor &Accessor = tinyModel->accessors[accessorIdx];
-    std::vector<u32> RetVal;
     u32 BufferViewIdx = Accessor.bufferView;
     u32 BufferViewOffset = tinyModel->bufferViews[BufferViewIdx].byteOffset;
     u32 Count = Accessor.count;
@@ -449,31 +458,31 @@ GLTFModel::LoadIndices(tinygltf::Model *tinyModel, i32 accessorIdx) {
     u32 ComponentsPerElement = Type == TINYGLTF_TYPE_SCALAR ? 1 : Type;
     u32 Offset = BufferViewOffset + Accessor.byteOffset;
     
-    if(ComponentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
-        u32 *pValue = reinterpret_cast<u32*>(mData.data() + Offset);
-        for(u32 i = 0; i < Accessor.count * ComponentsPerElement; ++i) {
-            u32 Value = *pValue;
-            RetVal.push_back(*pValue);
-            ++pValue;
-        }
-    } else if (ComponentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT
-        || ComponentType == TINYGLTF_COMPONENT_TYPE_SHORT) {
-        // NOTE(Jovan): Unsigned or signed short
-        u16 *pValue = reinterpret_cast<u16*>(mData.data() + Offset);
-        for(u32 i = 0; i < Accessor.count * ComponentsPerElement; ++i) {
-            u16 Value = *pValue;
-            RetVal.push_back(*pValue);
-            ++pValue;
-        }
-    } else {
-        // NOTE(Jovan): Unsigned byte
-        u8 *pValue = reinterpret_cast<u8*>(mData.data() + Offset);
-        for(u32 i = 0; i < Accessor.count * ComponentsPerElement; ++i) {
-            u8 Value = *pValue;
-            RetVal.push_back(Value);
-            ++pValue;
+    switch (ComponentType) {
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT: {
+            u32 *pValue = reinterpret_cast<u32*>(mData.data() + Offset);
+            for(u32 i = 0; i < Accessor.count * ComponentsPerElement; ++i) {
+                u32 Value = *pValue;
+                out.push_back(*pValue);
+                ++pValue;
+            }
+        } break;
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+        case TINYGLTF_COMPONENT_TYPE_SHORT: {
+            u16 *pValue = reinterpret_cast<u16*>(mData.data() + Offset);
+            for(u32 i = 0; i < Accessor.count * ComponentsPerElement; ++i) {
+                u16 Value = *pValue;
+                out.push_back(*pValue);
+                ++pValue;
+            }
+        } break;
+        default: {
+            u8 *pValue = reinterpret_cast<u8*>(mData.data() + Offset);
+            for(u32 i = 0; i < Accessor.count * ComponentsPerElement; ++i) {
+                u8 Value = *pValue;
+                out.push_back(Value);
+                ++pValue;
+            }
         }
     }
-
-    return RetVal;
 }
