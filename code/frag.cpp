@@ -1,5 +1,6 @@
 #include "frag.hpp"
 #include "math3d.hpp"
+#include "tiny_gltf_model_loader.hpp"
 
 OrbitalCamera::OrbitalCamera(r32 fov, r32 distance, r32 rotateSpeed,
                              r32 zoomSpeed, const v3 &worldUp, const v3 &target)
@@ -102,6 +103,10 @@ State::State(OrbitalCamera *camera)
   mDT = 0.0f;
   mImGUIInitialized = false;
   mShowBones = true;
+
+  TinyGltfModelLoader tinyGltfModelLoader;
+  tinyGltfModelLoader.load(mBonesModel);
+  tinyGltfModelLoader.load(mMusclesModel);
 }
 
 Input &State::GetNewInput() { return *mNewInput; }

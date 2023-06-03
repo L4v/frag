@@ -1,7 +1,8 @@
 #ifndef GLTF_MODEL_HPP
 #define GLTF_MODEL_HPP
 
-#include "include/tiny_gltf.h"
+#include "animation.hpp"
+#include "animation_skeleton.hpp"
 #include "math3d.hpp"
 #include "mesh.hpp"
 #include "shader.hpp"
@@ -10,77 +11,21 @@
 #include <cstring>
 #include <iostream>
 #include <iterator>
+#include <map>
 #include <string>
 
+struct ModelTexture { // TODO(Jovan): Move out? Or leave if gltf model becomes
+                      // jsut model
+  r32 mWidth;
+  r32 mHeight;
+
+  u32 mId;
+  ModelTexture();
+  ModelTexture(r32 width, r32 height, const u8 *data);
+};
+
 class GLTFModel {
-  class Texture {
-    r32 mWidth;
-    r32 mHeight;
 
-  public:
-    u32 mId;
-    Texture();
-    Texture(r32 width, r32 height, const u8 *data);
-  };
-
-  template <typename T> class Keyframes {
-  private:
-    u8 mElementCount;
-
-    r32 calculateInterpolationFactor(T &start, T &end, r64 timeInSeconds);
-
-  public:
-    Keyframes<T>();
-    u32 mCount;
-    std::vector<r32> mTimes;
-    std::vector<T> mValues;
-
-    void Load(const r32 *timesData, const r32 *valuesData);
-    T Interpolate(r64 timeInSeconds);
-  };
-
-  struct AnimKeyframes {
-    Keyframes<v3> mTranslation;
-    Keyframes<quat> mRotation;
-    Keyframes<v3> mScale;
-
-    void Load(const std::string &path, u32 count, const r32 *timesData,
-              const r32 *valuesData);
-  };
-
-  struct Animation {
-    i32 mIdx;
-    r64 mDurationInSeconds;
-    r32 mSpeed;
-    std::map<i32, std::vector<i32>> mNodeToChannel;
-    std::map<i32, AnimKeyframes> mJointKeyframes;
-
-    Animation(i32 idx);
-    r64 GetAnimationTime(r64 timeInSeconds);
-  };
-
-  struct Node {
-    Node(const tinygltf::Node &node, i32 nodeIdx, i32 parentIdx,
-         const m44 &localTransform, const m44 &parentTransform);
-    i32 mIdx;
-    i32 mParentIdx;
-    std::string mName;
-    std::vector<i32> mChildren;
-    m44 mLocalTransform;
-    m44 mGlobalTransform;
-  };
-
-  struct Joint {
-    Joint(const GLTFModel::Node &node, i32 skinJointIdx,
-          const m44 &inverseBindPoseTransform);
-    i32 mIdx;
-    i32 mParentIdx;
-    std::string mName;
-    m44 mLocalTransform;
-    m44 mInverseBindPoseTransform;
-  };
-
-  std::vector<u8> mData;
   std::vector<m44> mInverseBindPoseMatrices;
   std::map<i32, i32> mNodeToJointIdx;
   std::map<i32, i32> mNodeToNodeIdx;
@@ -89,24 +34,8 @@ class GLTFModel {
   std::vector<Joint> mJoints;
   std::vector<Mesh> mMeshes;
   std::vector<Node> mNodes;
-  std::map<std::string, Texture> mTextures;
 
-  void loadFloats(tinygltf::Model *tinyModel, i32 accessorIdx,
-                  std::vector<r32> &out);
-  void loadIndices(tinygltf::Model *tinyModel, i32 accessorIdx,
-                   std::vector<u32> &out);
-  m44 getLocalTransform(const tinygltf::Node &node);
-  void loadData(tinygltf::Model *tinyModel, const std::string &filePath);
-  void loadNodes(tinygltf::Model *tinyModel);
-  void loadMeshVertices(tinygltf::Model *tinyModel,
-                        std::map<std::string, int> &attributes,
-                        std::vector<Mesh::Vertex> &outVertices);
-  void loadMesh(tinygltf::Model *tinyModel, u32 meshIdx);
-  void loadJointsFromNodes(tinygltf::Model *tinyModel,
-                           const tinygltf::Skin &skin);
-  void loadAnimations(tinygltf::Model *tinyModel);
-  void traverseNodes(tinygltf::Model *tinyModel, i32 nodeIdx, i32 parentIdx,
-                     const m44 &parentTransform);
+  std::map<std::string, ModelTexture> mTextures;
 
 public:
   std::string mFilePath;
@@ -116,9 +45,31 @@ public:
   Animation *mActiveAnimation;
 
   GLTFModel(const std::string &filePath);
+
+  void
+  setActiveAnimation(i32 animationIdx); // TODO(Jovan): Temp way of doing it
+  void addInverseBindPoseMatrix(const m44 &matrix);
+  void setInverseGlobalTransform(const m44 &transform);
+  void mapNodeToNodeIdx(i32 key, i32 value);
+  u32 getNodeCount() const;
+  void addNode(const Node &node);
+  std::vector<Joint> getJoints() const;
+  void addAnimation(const Animation &animation);
+  i32 getNodeIdxMappedToNode(i32 nodeIdx);
+  Node getNode(i32 nodeIdx) const;
+  void mapNodeToJointIdx(i32 key, i32 value);
+  u32 getJointCount() const;
+  m44 getInverseBindPoseMatrix(u32 idx) const;
+  bool checkIfNodeToJointIdxExists(u32 nodeIdx) const;
+  void addJoint(const Joint &joint);
+  i32 getNodeIdxMappedToJoint(i32 nodeIdx);
+
   void render(const Shader &program);
   void calculateJointTransforms(std::vector<m44> &jointTransforms,
                                 r64 timeInSeconds);
+  void addMesh(const Mesh &mesh);
+  i32 getTextureIdByName(const std::string &name);
+  void mapNameToTexture(const std::string &name, const ModelTexture &texture);
 };
 
 #endif
