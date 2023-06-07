@@ -31,6 +31,8 @@ public:
 
   Mesh(const std::vector<Vertex> &vertices, const std::vector<u32> &indices);
   void render(const Shader &program) const;
+  // m44 &getModelTransform();
+  // void setModelTransform(const m44 &transform); // TODO(Jovan): Needed?
 
 private:
   std::vector<Vertex> mVertices;
@@ -38,6 +40,7 @@ private:
   u32 VAO;
   u32 VBO;
   u32 EBO;
+  m44 mModelTransform;
 };
 
 #endif

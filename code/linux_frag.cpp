@@ -12,7 +12,7 @@
 #include "include/imgui/imgui_internal.h"
 
 #include "frag.hpp"
-#include "gltf_model.hpp"
+#include "model.hpp"
 #include "shader.hpp"
 #include "types.hpp"
 
@@ -140,6 +140,16 @@ struct TimeInfo {
   r64 getDeltaMs() { return frameEndMs - frameStartMs; }
 };
 
+void resizePickingFramebuffer(u32 fbo, u32 rbo, u32 texture, r32 width,
+                              r32 height) {
+  glBindTexture(GL_TEXTURE_2D, texture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
+               GL_UNSIGNED_BYTE, (void *)0);
+
+  glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height);
+}
+
 i32 main() {
   if (!glfwInit()) {
     std::cerr << "Failed to init GLFW" << std::endl;
@@ -167,6 +177,7 @@ i32 main() {
   ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
   Shader riggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
+  Shader pickingShader("../shaders/picking.vert", "../shaders/picking.frag");
 
   v3 modelPosition = v3(0.0f);
   v3 modelRotation = v3(0.0f);
@@ -199,6 +210,36 @@ i32 main() {
   const std::string sceneWindowName = "Scene";
   const std::string modelWindowName = "Model";
 
+  v2 sceneCursorPos(0.0f);
+  v2 sceneWindowPos(0.0f);
+
+  u32 pickingTexture;
+  glGenTextures(1, &pickingTexture);
+  glBindTexture(GL_TEXTURE_2D, pickingTexture);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, currState.mWindow.mSize.X,
+               currState.mWindow.mSize.Y, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+               (void *)0);
+
+  u32 pickingDepthBuffer;
+  glGenRenderbuffers(1, &pickingDepthBuffer);
+  glBindRenderbuffer(GL_RENDERBUFFER, pickingDepthBuffer);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16,
+                        currState.mWindow.mSize.X, currState.mWindow.mSize.Y);
+
+  u32 pickingFramebuffer;
+  glGenFramebuffers(1, &pickingFramebuffer);
+  glBindFramebuffer(GL_FRAMEBUFFER, pickingFramebuffer);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         pickingTexture, 0);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                            GL_RENDERBUFFER, pickingDepthBuffer);
+
+  u32 pickedId = 0;
+
   glEnable(GL_TEXTURE_2D);
   GLbitfield clearMask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
   v4 clearColor(0x34 / (r32)255, 0x49 / (r32)255, 0x5e / (r32)255, 1.0f);
@@ -209,12 +250,52 @@ i32 main() {
     currState.BeginFrame();
     glfwPollEvents();
 
+    MouseController mouseController = currState.GetNewInput().mMouse;
+    sceneCursorPos = mouseController.mCursorPos - sceneWindowPos;
+
+    UpdateState(&currState);
+    std::vector<m44> BoneTransforms;
+    Model *currModel = currState.mCurrModel;
+    currModel->calculateJointTransforms(BoneTransforms,
+                                        currState.mCurrentTimeInSeconds);
+    currModel->mModelTransform.LoadIdentity()
+        .Translate(modelPosition)
+        .Rotate(quat(v3(1.0f, 0.0f, 0.0f), modelRotation.X))
+        .Rotate(quat(v3(0.0f, 1.0f, 0.0f), modelRotation.Y))
+        .Rotate(quat(v3(0.0f, 0.0f, 1.0f), modelRotation.Z))
+        .Scale(modelScale);
+
     view.LoadIdentity();
     view = LookAt(camera.mPosition, camera.mTarget, camera.mUp);
 
+    FramebufferGL::Bind(pickingFramebuffer, v4(0.0f, 0.0f, 0.0f, 1.0f),
+                        clearMask, framebuffer->mSize);
+
+    // PICKING PHASE ===============
+    glUseProgram(pickingShader.mId);
+    pickingShader.SetUniform4m("uProjection", currState.mProjection);
+    pickingShader.SetUniform3f("uViewPos", camera.mPosition);
+    pickingShader.SetUniform4m("uView", view);
+    pickingShader.SetUniform1i("uDisplayBoneIdx", 0);
+    pickingShader.SetUniform4m("uBones", BoneTransforms);
+    currModel->render(pickingShader, 0);
+
+    glFlush();
+    glFinish();
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+    u8 pickData[4];
+
+    GLint pickingX = sceneCursorPos.X;
+    GLint pickingY = framebuffer->mSize.Y - sceneCursorPos.Y;
+    glReadPixels(pickingX, pickingY, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pickData);
+    pickedId = pickData[0] + (pickData[1] << 8) + (pickData[2] << 16);
+    std::cout << "Id: " << pickedId << ", pickingX: " << pickingX
+              << ", pickingY: " << pickingY << " cursorX: " << sceneCursorPos.X
+              << ", cursorY: " << sceneCursorPos.Y << std::endl;
+    // END PICKING PHASE ===========
     FramebufferGL::Bind(framebuffer->mId, clearColor, clearMask,
                         framebuffer->mSize);
-
     glUseProgram(riggedPhong.mId);
     riggedPhong.SetUniform4m("uProjection", currState.mProjection);
     riggedPhong.SetUniform3f("uViewPos", camera.mPosition);
@@ -222,20 +303,8 @@ i32 main() {
     riggedPhong.SetUniform1i("uDisplayBoneIdx", 0);
 
     // NOTE(Jovan): Render model
-    UpdateAndRender(&currState);
-    std::vector<m44> BoneTransforms;
-    GLTFModel *currModel = currState.mCurrModel;
-    currModel->calculateJointTransforms(BoneTransforms,
-                                        currState.mCurrentTimeInSeconds);
     riggedPhong.SetUniform4m("uBones", BoneTransforms);
-
-    currModel->mModelTransform.LoadIdentity()
-        .Translate(modelPosition)
-        .Rotate(quat(v3(1.0f, 0.0f, 0.0f), modelRotation.X))
-        .Rotate(quat(v3(0.0f, 1.0f, 0.0f), modelRotation.Y))
-        .Rotate(quat(v3(0.0f, 0.0f, 1.0f), modelRotation.Z))
-        .Scale(modelScale);
-    currModel->render(riggedPhong);
+    currModel->render(riggedPhong, pickedId);
 
     FramebufferGL::Bind(0, clearColor, clearMask, currState.mWindow.mSize);
     glUseProgram(0);
@@ -251,7 +320,6 @@ i32 main() {
     ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
     ImGui::SetNextWindowSize(Size);
     ImGui::Begin(mainWindowName.c_str(), NULL, mainWindowFlags);
-    ImVec2 Pos(0.0f, 0.0f);
     ImGuiID DockID = ImGui::GetID("DockSpace");
     ImGui::DockSpace(DockID);
 
@@ -283,10 +351,17 @@ i32 main() {
       if (currState.mFramebuffer.mSize.X != windowSize.x ||
           currState.mFramebuffer.mSize.Y != windowSize.y) {
         currState.mFramebuffer.Resize(windowSize.x, windowSize.y);
+        resizePickingFramebuffer(pickingFramebuffer, pickingDepthBuffer,
+                                 pickingTexture, windowSize.x, windowSize.y);
       }
 
       ImGui::Image((ImTextureID)currState.mFramebuffer.mTexture, windowSize,
                    ImVec2(0, 1), ImVec2(1, 0));
+
+      ImVec2 imSceneWindowPos = ImGui::GetWindowPos();
+      sceneWindowPos.X = imSceneWindowPos.x;
+      sceneWindowPos.Y = imSceneWindowPos.y;
+
       ImGui::EndChild();
     }
     ImGui::End();
@@ -304,7 +379,7 @@ i32 main() {
     ImGui::Text("Vertices: %d", currModel->mVerticesCount);
     ImGui::Spacing();
     ImGui::SliderFloat("Animation speed", &currModel->mActiveAnimation->mSpeed,
-                       1e-2f, 4.0f, "%.2f");
+                       0.0f, 4.0f, "%.2f");
     ImGui::End();
 
     // NOTE(Jovan): Camera window

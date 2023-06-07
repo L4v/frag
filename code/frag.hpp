@@ -1,8 +1,8 @@
 #ifndef FRAG_HPP
 #define FRAG_HPP
 #include "framebuffer_gl.hpp"
-#include "gltf_model.hpp"
 #include "math3d.hpp"
+#include "model.hpp"
 #include "types.hpp"
 #include "util.hpp"
 
@@ -84,13 +84,13 @@ private:
   Input mInputBuffers[2] = {0};
   Input *mNewInput;
   Input *mOldInput;
-  GLTFModel mBonesModel;
-  GLTFModel mMusclesModel;
+  Model mBonesModel;
+  Model mMusclesModel;
 
 public:
   FramebufferGL mFramebuffer;
   OrbitalCamera *mCamera;
-  GLTFModel *mCurrModel;
+  Model *mCurrModel;
   Window mWindow;
   m44 mProjection;
   r32 mDT;
@@ -107,6 +107,6 @@ public:
   void UpdateModel();
 };
 
-void UpdateAndRender(State *state);
+void UpdateState(State *state);
 
 #endif

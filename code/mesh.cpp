@@ -64,3 +64,8 @@ void Mesh::render(const Shader &program) const {
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
   glDrawElements(GL_TRIANGLES, mIndices.size(), GL_UNSIGNED_INT, 0);
 }
+
+// m44 &Mesh::getModelTransform() { return mModelTransform; }
+// void Mesh::setModelTransform(const m44 &transform) {
+//   mModelTransform = transform;
+// }

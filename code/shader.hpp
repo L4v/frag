@@ -1,11 +1,11 @@
 #ifndef SHADER_HPP
 #define SHADER_HPP
 
+#include <algorithm>
+#include <fstream>
 #include <iostream>
 #include <string>
-#include <fstream>
 #include <vector>
-#include <algorithm>
 
 #include "include/glad/glad.h"
 #include "math3d.hpp"
@@ -13,75 +13,85 @@
 #define POINT_LIGHT_COUNT 1
 
 struct Light {
-    r32 Size;
-    r32 Kc;
-    r32 Kl;
-    r32 Kq;
+  r32 Size;
+  r32 Kc;
+  r32 Kl;
+  r32 Kq;
 
-    v3 Position;
-    v3 Ambient;
-    v3 Diffuse;
-    v3 Specular;
+  v3 Position;
+  v3 Ambient;
+  v3 Diffuse;
+  v3 Specular;
 };
 
 struct GLBuffers {
-    enum EBufferType {
-        INDEX_BUFFER = 0,
-        POSITION_VB,
-        TEXCOORD_VB,
-        NORMAL_VB,
-        BONE_VB,
+  enum EBufferType {
+    INDEX_BUFFER = 0,
+    POSITION_VB,
+    TEXCOORD_VB,
+    NORMAL_VB,
+    BONE_VB,
 
-        BUFFER_COUNT,
-    };
+    BUFFER_COUNT,
+  };
 
-    enum EBufferLocations {
-        POSITION_LOCATION = 0,
-        TEXCOORD_LOCATION,
-        NORMAL_LOCATION,
-        BONE_ID_LOCATION,
-        BONE_WEIGHT_LOCATION
-    };
+  enum EBufferLocations {
+    POSITION_LOCATION = 0,
+    TEXCOORD_LOCATION,
+    NORMAL_LOCATION,
+    BONE_ID_LOCATION,
+    BONE_WEIGHT_LOCATION
+  };
 
-    u32 mIds[BUFFER_COUNT];
+  u32 mIds[BUFFER_COUNT];
 
-    GLBuffers();
-    void Destroy();
-    void BufferData(EBufferType bufferType, GLsizeiptr dataSize, const void *data, GLenum target = GL_ARRAY_BUFFER, GLenum usage = GL_STATIC_DRAW);
-    void SetPointer(EBufferType bufferType, GLuint attribIndex, GLint size, GLenum dataType, GLsizei stride, const void *pointer, GLboolean normalized = GL_FALSE, GLenum target = GL_ARRAY_BUFFER);
-    void SetIPointer(EBufferType bufferType, GLuint attribIndex, GLint size, GLenum dataType, GLsizei stride, const void *pointer, GLenum target = GL_ARRAY_BUFFER);
-    
+  GLBuffers();
+  void Destroy();
+  void BufferData(EBufferType bufferType, GLsizeiptr dataSize, const void *data,
+                  GLenum target = GL_ARRAY_BUFFER,
+                  GLenum usage = GL_STATIC_DRAW);
+  void SetPointer(EBufferType bufferType, GLuint attribIndex, GLint size,
+                  GLenum dataType, GLsizei stride, const void *pointer,
+                  GLboolean normalized = GL_FALSE,
+                  GLenum target = GL_ARRAY_BUFFER);
+  void SetIPointer(EBufferType bufferType, GLuint attribIndex, GLint size,
+                   GLenum dataType, GLsizei stride, const void *pointer,
+                   GLenum target = GL_ARRAY_BUFFER);
 };
 
 struct Texture {
-    enum ETextureType {
-        DIFFUSE = 0,
-        SPECULAR,
+  enum ETextureType {
+    DIFFUSE = 0,
+    SPECULAR,
 
-        TYPECOUNT
-    };
+    TYPECOUNT
+  };
 
-    u32          mId;
-    ETextureType mType;
-    std::string  mPath;
-    Texture(const std::string &path, ETextureType type);
-    ~Texture();
+  u32 mId;
+  ETextureType mType;
+  std::string mPath;
+  Texture(const std::string &path, ETextureType type);
+  ~Texture();
 };
 
 class Shader {
 public:
-    u32 mId;
+  u32 mId;
 
-    Shader(const std::string &vShaderPath, const std::string &fShaderPath);
-    void SetPointLight(const Light &light, u32 index);
-    void SetUniform1i(const std::string &uniform, i32 i) const;
-    void SetUniform1f(const std::string &uniform, r32 f) const;
-    void SetUniform3f(const std::string &uniform, const v3 &v) const;
-    void SetUniform4m(const std::string &uniform, const m44 &m, GLboolean transpose = GL_FALSE) const;
-    void SetUniform4m(const std::string &uniform, const std::vector<m44> &m, GLboolean transpose = GL_FALSE) const;
+  Shader(const std::string &vShaderPath, const std::string &fShaderPath);
+  void SetPointLight(const Light &light, u32 index);
+  void SetUniform1i(const std::string &uniform, i32 i) const;
+  void SetUniform1f(const std::string &uniform, r32 f) const;
+  void SetUniform3f(const std::string &uniform, const v3 &v) const;
+  void SetUniform4f(const std::string &uniform, const v4 &v) const;
+  void SetUniform4m(const std::string &uniform, const m44 &m,
+                    GLboolean transpose = GL_FALSE) const;
+  void SetUniform4m(const std::string &uniform, const std::vector<m44> &m,
+                    GLboolean transpose = GL_FALSE) const;
+
 private:
-    u32 loadAndCompileShader(std::string filename, GLuint shaderType);
-    u32 createBasicProgram(u32 vShader, u32 fShader);
+  u32 loadAndCompileShader(std::string filename, GLuint shaderType);
+  u32 createBasicProgram(u32 vShader, u32 fShader);
 };
 
 #endif

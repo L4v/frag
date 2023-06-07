@@ -1,6 +1,9 @@
 #include "tiny_gltf_model_loader.hpp"
+#define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "include/tiny_gltf.h"
 
-void TinyGltfModelLoader::load(GLTFModel &gltfModel) {
+void TinyGltfModelLoader::load(Model &gltfModel) {
   tinygltf::Model tinyModel;
   loadData(tinyModel, gltfModel.mFilePath);
   loadNodes(&tinyModel, gltfModel);
@@ -42,7 +45,7 @@ void TinyGltfModelLoader::loadData(tinygltf::Model &tinyModel,
 }
 
 void TinyGltfModelLoader::loadNodes(tinygltf::Model *tinyModel,
-                                    GLTFModel &gltfModel) {
+                                    Model &gltfModel) {
   const tinygltf::Skin &Skin = tinyModel->skins[0];
   std::vector<r32> InverseBindPoseReals;
   loadFloats(tinyModel, Skin.inverseBindMatrices, InverseBindPoseReals);
@@ -60,7 +63,7 @@ void TinyGltfModelLoader::loadNodes(tinygltf::Model *tinyModel,
 }
 
 void TinyGltfModelLoader::loadJointsFromNodes(tinygltf::Model *tinyModel,
-                                              GLTFModel &gltfModel,
+                                              Model &gltfModel,
                                               const tinygltf::Skin &skin) {
   for (u32 i = 0; i < skin.joints.size(); ++i) {
     i32 SkinJointIdx = skin.joints[i];
@@ -92,7 +95,7 @@ void TinyGltfModelLoader::loadJointsFromNodes(tinygltf::Model *tinyModel,
 }
 
 void TinyGltfModelLoader::traverseNodes(tinygltf::Model *tinyModel,
-                                        GLTFModel &gltfModel, i32 nodeIdx,
+                                        Model &gltfModel, i32 nodeIdx,
                                         i32 parentIdx,
                                         const m44 &parentTransform) {
   const tinygltf::Node TinyNode = tinyModel->nodes[nodeIdx];
@@ -137,8 +140,8 @@ m44 TinyGltfModelLoader::getLocalTransform(const tinygltf::Node &node) {
   return LocalTransform;
 }
 
-void TinyGltfModelLoader::loadMesh(tinygltf::Model *tinyModel,
-                                   GLTFModel &gltfModel, u32 meshIdx) {
+void TinyGltfModelLoader::loadMesh(tinygltf::Model *tinyModel, Model &gltfModel,
+                                   u32 meshIdx) {
   tinygltf::Mesh &TinyMesh = tinyModel->meshes[meshIdx];
   tinygltf::Primitive &Primitive0 = TinyMesh.primitives[0];
 
@@ -200,7 +203,7 @@ void TinyGltfModelLoader::loadMeshVertices(
 }
 
 void TinyGltfModelLoader::loadAnimations(tinygltf::Model *tinyModel,
-                                         GLTFModel &gltfModel) {
+                                         Model &gltfModel) {
   for (u32 AnimIdx = 0; AnimIdx < tinyModel->animations.size(); ++AnimIdx) {
     const tinygltf::Animation &TinyAnimation = tinyModel->animations[AnimIdx];
     Animation CurrAnim = Animation(AnimIdx);

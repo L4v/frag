@@ -4,7 +4,7 @@
 
 struct DirLight {
     vec3 Direction;
-    
+
     vec3 Ambient;
     vec3 Diffuse;
     vec3 Specular;
@@ -37,6 +37,7 @@ uniform float      uTexScale;
 uniform sampler2D  uDiffuse;
 uniform sampler2D  uSpecular;
 uniform int uDisplayBoneIdx;
+uniform vec4 uHighlightColor;
 
 vec2 ScaledTexCoord;
 
@@ -60,21 +61,21 @@ void main() {
         Result += CalculatePointLight(uPointLights[PtLightIdx], NormalizedNormal, FragPos, ViewDir);
     }
 
-    FragColor = vec4(Result, 1.0);
+    FragColor = vec4(Result, 1.0) * uHighlightColor;
 }
 
 vec3
 CalculateDirLight(DirLight light, vec3 normal, vec3 viewDir) {
     vec3 LightDir = normalize(-light.Direction);
     float Diffuse = max(dot(normal, LightDir), 0.0);
-    
+
     vec3 ReflectDir = reflect(-LightDir, normal);
     float Specular = pow(max(dot(viewDir, ReflectDir), 0.0), 128.0f);
-    
+
     vec3 vAmbient = light.Ambient * vec3(texture(uDiffuse, ScaledTexCoord));
     vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(uDiffuse, ScaledTexCoord));
     vec3 vSpecular = light.Specular * Specular * vec3(texture(uSpecular, ScaledTexCoord));
-    
+
     return (vAmbient + vDiffuse + vSpecular);
 }
 
@@ -82,13 +83,13 @@ vec3
 CalculatePointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
     vec3 LightDir = normalize(light.Position - fragPos);
     float Diffuse = max(dot(normal, LightDir), 0.0);
-    
+
     vec3 ReflectDir = reflect(-LightDir, normal);
     float Specular = pow(max(dot(viewDir, ReflectDir), 0.0), 128.0f);
 
     float Distance = length(light.Position - FragPos);
     float Attenuation = 1.0 / (light.Kc + light.Kl * Distance + light.Kq * (Distance * Distance));
-    
+
     vec3 vAmbient = light.Ambient * vec3(texture(uDiffuse, ScaledTexCoord));
     vec3 vDiffuse = light.Diffuse * Diffuse * vec3(texture(uDiffuse, ScaledTexCoord));
     vec3 vSpecular = light.Specular * Specular * vec3(texture(uSpecular, ScaledTexCoord));

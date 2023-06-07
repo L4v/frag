@@ -94,7 +94,7 @@ Window::Window(u32 width, u32 height) : mSize(width, height) {
 
 State::State(OrbitalCamera *camera)
     : mWindow(800, 600), mFramebuffer(1920, 1080), mCamera(camera),
-      mBonesModel("../res/backleg_bones.gltf"),
+      mBonesModel("../res/backleg1rigging_separation.gltf"),
       mMusclesModel("../res/backleg_muscles.glb") {
   mNewInput = &mInputBuffers[0];
   mOldInput = &mInputBuffers[1];
@@ -139,7 +139,7 @@ void State::UpdateModel() {
   mCurrModel = mShowBones ? &mBonesModel : &mMusclesModel;
 }
 
-void UpdateAndRender(State *state) {
+void UpdateState(State *state) {
   const Input *CurrInput = &state->GetNewInput();
   const KeyboardController *NewKC = &CurrInput->mKeyboard;
   OrbitalCamera *Camera = state->mCamera;

@@ -1,5 +1,5 @@
-#ifndef GLTF_MODEL_HPP
-#define GLTF_MODEL_HPP
+#ifndef MODEL_HPP
+#define MODEL_HPP
 
 #include "animation.hpp"
 #include "animation_skeleton.hpp"
@@ -24,7 +24,7 @@ struct ModelTexture { // TODO(Jovan): Move out? Or leave if gltf model becomes
   ModelTexture(r32 width, r32 height, const u8 *data);
 };
 
-class GLTFModel {
+class Model {
 
   std::vector<m44> mInverseBindPoseMatrices;
   std::map<i32, i32> mNodeToJointIdx;
@@ -44,7 +44,7 @@ public:
   m44 mModelTransform;
   Animation *mActiveAnimation;
 
-  GLTFModel(const std::string &filePath);
+  Model(const std::string &filePath);
 
   void
   setActiveAnimation(i32 animationIdx); // TODO(Jovan): Temp way of doing it
@@ -64,7 +64,7 @@ public:
   void addJoint(const Joint &joint);
   i32 getNodeIdxMappedToJoint(i32 nodeIdx);
 
-  void render(const Shader &program);
+  void render(const Shader &program, u32 highlightedId);
   void calculateJointTransforms(std::vector<m44> &jointTransforms,
                                 r64 timeInSeconds);
   void addMesh(const Mesh &mesh);

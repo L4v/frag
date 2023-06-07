@@ -88,7 +88,7 @@ void AnimKeyframes::Load(const std::string &path, u32 count,
     mRotation.load(timesData, valuesData);
   } else if (path == "scale") {
     mScale.mCount = count; // TODO(Jovan): Is this below wrong???
-    mRotation.load(timesData, valuesData);
+    mScale.load(timesData, valuesData);
   }
 }
 

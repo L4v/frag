@@ -1,9 +1,4 @@
-#include "gltf_model.hpp"
-#include "imodel_loader.hpp"
-
-#define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "include/tiny_gltf.h"
+#include "model.hpp"
 
 ModelTexture::ModelTexture() {
   mWidth = 0.0f;
@@ -29,14 +24,13 @@ ModelTexture::ModelTexture(r32 width, r32 height, const u8 *data) {
                   GL_LINEAR_MIPMAP_LINEAR);
 }
 
-GLTFModel::GLTFModel(const std::string &filePath) {
+Model::Model(const std::string &filePath) {
   mFilePath = filePath;
   mModelTransform.LoadIdentity();
-  // load(modelLoader); // TODO(Jovan): Remove dependency
 }
 
-void GLTFModel::calculateJointTransforms(std::vector<m44> &jointTransforms,
-                                         r64 timeInSeconds) {
+void Model::calculateJointTransforms(std::vector<m44> &jointTransforms,
+                                     r64 timeInSeconds) {
   std::vector<m44> LocalTransforms(mJoints.size());
   std::vector<m44> GlobalJointTransforms(mJoints.size());
   jointTransforms.resize(mJoints.size());
@@ -88,68 +82,81 @@ void GLTFModel::calculateJointTransforms(std::vector<m44> &jointTransforms,
   }
 }
 
-void GLTFModel::render(const Shader &program) {
+void Model::render(const Shader &program, u32 highlightedId) {
   program.SetUniform4m("uModel", mModelTransform);
   for (u32 i = 0; i < mMeshes.size(); ++i) {
-    mMeshes[i].render(program);
+    Mesh &mesh = mMeshes[i];
+    u32 id = i + 1;
+    r32 r =
+        (id & 0x000000FF) / 255.0f; // TODO(Jovan): Thids should be moved out
+    r32 g = ((id & 0x0000FF00) >> 8) / 255.0f;
+    r32 b = ((id & 0x00FF0000) >> 16) / 255.0f;
+    program.SetUniform4f("uId", v4(r, g, b, 1.0f));
+    program.SetUniform4m("uModel", mModelTransform);
+    if (highlightedId == id) {
+      program.SetUniform4f("uHighlightColor", v4(1.0f, 0.0f, 1.0f, 0.0f));
+    } else {
+      program.SetUniform4f("uHighlightColor", v4(1.0f));
+    }
+    mesh.render(program);
   }
 }
 
-void GLTFModel::setActiveAnimation(i32 animationIdx) {
+void Model::setActiveAnimation(i32 animationIdx) {
   mActiveAnimation = &mAnimations[animationIdx];
 }
 
-void GLTFModel::addInverseBindPoseMatrix(const m44 &matrix) {
+void Model::addInverseBindPoseMatrix(const m44 &matrix) {
   mInverseBindPoseMatrices.push_back(matrix);
 }
 
-void GLTFModel::setInverseGlobalTransform(const m44 &transform) {
+void Model::setInverseGlobalTransform(const m44 &transform) {
   mInverseGlobalTransform = transform;
 }
 
-void GLTFModel::mapNodeToNodeIdx(i32 key, i32 value) {
+void Model::mapNodeToNodeIdx(i32 key, i32 value) {
   mNodeToNodeIdx[key] = value;
 }
 
-u32 GLTFModel::getNodeCount() const { return mNodes.size(); }
+u32 Model::getNodeCount() const { return mNodes.size(); }
 
-void GLTFModel::addNode(const Node &node) { mNodes.push_back(node); }
+void Model::addNode(const Node &node) { mNodes.push_back(node); }
 
-std::vector<Joint> GLTFModel::getJoints() const { return mJoints; }
+std::vector<Joint> Model::getJoints() const { return mJoints; }
 
-void GLTFModel::addAnimation(const Animation &animation) {
+void Model::addAnimation(const Animation &animation) {
   mAnimations.push_back(animation);
 }
 
-i32 GLTFModel::getNodeIdxMappedToNode(i32 nodeIdx) {
+i32 Model::getNodeIdxMappedToNode(i32 nodeIdx) {
   return mNodeToNodeIdx[nodeIdx];
 }
 
-Node GLTFModel::getNode(i32 nodeIdx) const { return mNodes[nodeIdx]; }
+Node Model::getNode(i32 nodeIdx) const { return mNodes[nodeIdx]; }
 
-void GLTFModel::mapNodeToJointIdx(i32 key, i32 value) {
+void Model::mapNodeToJointIdx(i32 key, i32 value) {
   mNodeToJointIdx[key] = value;
 }
 
-u32 GLTFModel::getJointCount() const { return mJoints.size(); }
+u32 Model::getJointCount() const { return mJoints.size(); }
 
-m44 GLTFModel::getInverseBindPoseMatrix(u32 idx) const {
+m44 Model::getInverseBindPoseMatrix(u32 idx) const {
   return mInverseBindPoseMatrices[idx];
 }
 
-bool GLTFModel::checkIfNodeToJointIdxExists(u32 nodeIdx) const {
+bool Model::checkIfNodeToJointIdxExists(u32 nodeIdx) const {
   return mNodeToJointIdx.find(nodeIdx) != mNodeToJointIdx.end();
 }
 
-void GLTFModel::addJoint(const Joint &joint) { mJoints.push_back(joint); }
+void Model::addJoint(const Joint &joint) { mJoints.push_back(joint); }
 
-i32 GLTFModel::getNodeIdxMappedToJoint(i32 nodeIdx) {
+i32 Model::getNodeIdxMappedToJoint(i32 nodeIdx) {
   return mNodeToJointIdx[nodeIdx];
 }
 
-void GLTFModel::addMesh(const Mesh &mesh) { mMeshes.push_back(mesh); }
+void Model::addMesh(const Mesh &mesh) { mMeshes.push_back(mesh); }
 
-i32 GLTFModel::getTextureIdByName(const std::string &name) {
+i32 Model::getTextureIdByName(const std::string &name) {
   std::map<std::string, ModelTexture>::const_iterator texIt =
       mTextures.find(name);
   if (texIt == mTextures.end()) {
@@ -158,7 +165,7 @@ i32 GLTFModel::getTextureIdByName(const std::string &name) {
   return texIt->second.mId;
 }
 
-void GLTFModel::mapNameToTexture(const std::string &name,
-                                 const ModelTexture &texture) {
+void Model::mapNameToTexture(const std::string &name,
+                             const ModelTexture &texture) {
   mTextures[name] = texture;
 }
