@@ -140,14 +140,58 @@ struct TimeInfo {
   r64 getDeltaMs() { return frameEndMs - frameStartMs; }
 };
 
-void resizePickingFramebuffer(u32 fbo, u32 rbo, u32 texture, r32 width,
-                              r32 height) {
-  glBindTexture(GL_TEXTURE_2D, texture);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
-               GL_UNSIGNED_BYTE, (void *)0);
+class ObjectPicker {
+private:
+  v2 mSize;
+  GLuint mTexture;
+  GLuint mFbo;
+  GLuint mDepthBuffer;
+  u32 mPickedId;
+  void init() {
+    glGenTextures(1, &mTexture);
+    glBindTexture(GL_TEXTURE_2D, mTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, mSize.X, mSize.Y, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, (void *)0);
 
-  glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height);
+    glGenRenderbuffers(1, &mDepthBuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, mDepthBuffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, mSize.X,
+                          mSize.Y);
+
+    u32 pickingFramebuffer;
+    glGenFramebuffers(1, &pickingFramebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, pickingFramebuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           mTexture, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                              GL_RENDERBUFFER, mDepthBuffer);
+  }
+
+public:
+  ObjectPicker(u32 width, u32 height) : mSize(width, height) { init(); }
+  ObjectPicker(const v2 &size) : mSize(size) { init(); }
+  u32 getPickedId() const { return mPickedId; }
+  void setPickedId(const u8 pickData[4]) {
+    mPickedId = pickData[0] + (pickData[1] << 8) + (pickData[2] << 16);
+  }
+  GLuint getFbo() { return mFbo; }
+  void resizeFramebuffer(r32 width, r32 height) {
+    glBindTexture(GL_TEXTURE_2D, mTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, (void *)0);
+
+    glBindRenderbuffer(GL_RENDERBUFFER, mDepthBuffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height);
+  }
+};
+
+void renderPass(const State &state, const Shader &shader,
+                const ObjectPicker &objectPicker) {
+  state.mCurrModel->render(shader, objectPicker.getPickedId());
 }
 
 i32 main() {
@@ -179,7 +223,7 @@ i32 main() {
   Shader riggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
   Shader pickingShader("../shaders/picking.vert", "../shaders/picking.frag");
 
-  v3 modelPosition = v3(0.0f);
+  v3 modelPosition = v3(0.0f, 4.0f, 0.0f);
   v3 modelRotation = v3(0.0f);
   v3 modelScale = v3(1.0f);
 
@@ -213,36 +257,12 @@ i32 main() {
   v2 sceneCursorPos(0.0f);
   v2 sceneWindowPos(0.0f);
 
-  u32 pickingTexture;
-  glGenTextures(1, &pickingTexture);
-  glBindTexture(GL_TEXTURE_2D, pickingTexture);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, currState.mWindow.mSize.X,
-               currState.mWindow.mSize.Y, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-               (void *)0);
-
-  u32 pickingDepthBuffer;
-  glGenRenderbuffers(1, &pickingDepthBuffer);
-  glBindRenderbuffer(GL_RENDERBUFFER, pickingDepthBuffer);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16,
-                        currState.mWindow.mSize.X, currState.mWindow.mSize.Y);
-
-  u32 pickingFramebuffer;
-  glGenFramebuffers(1, &pickingFramebuffer);
-  glBindFramebuffer(GL_FRAMEBUFFER, pickingFramebuffer);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                         pickingTexture, 0);
-  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                            GL_RENDERBUFFER, pickingDepthBuffer);
-
-  u32 pickedId = 0;
+  ObjectPicker objectPicker(framebuffer->mSize);
 
   glEnable(GL_TEXTURE_2D);
   GLbitfield clearMask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
   v4 clearColor(0x34 / (r32)255, 0x49 / (r32)255, 0x5e / (r32)255, 1.0f);
+
   while (!glfwWindowShouldClose(glfwWindow)) {
     timeInfo.frameStartMs = currentTimeInMillis();
     currState.mCurrentTimeInSeconds =
@@ -268,7 +288,7 @@ i32 main() {
     view.LoadIdentity();
     view = LookAt(camera.mPosition, camera.mTarget, camera.mUp);
 
-    FramebufferGL::Bind(pickingFramebuffer, v4(0.0f, 0.0f, 0.0f, 1.0f),
+    FramebufferGL::Bind(objectPicker.getFbo(), v4(0.0f, 0.0f, 0.0f, 1.0f),
                         clearMask, framebuffer->mSize);
 
     // PICKING PHASE ===============
@@ -278,20 +298,33 @@ i32 main() {
     pickingShader.SetUniform4m("uView", view);
     pickingShader.SetUniform1i("uDisplayBoneIdx", 0);
     pickingShader.SetUniform4m("uBones", BoneTransforms);
-    currModel->render(pickingShader, 0);
+    renderPass(currState, pickingShader, objectPicker);
 
     glFlush();
     glFinish();
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
     u8 pickData[4];
-
     GLint pickingX = sceneCursorPos.X;
     GLint pickingY = framebuffer->mSize.Y - sceneCursorPos.Y;
     glReadPixels(pickingX, pickingY, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pickData);
-    pickedId = pickData[0] + (pickData[1] << 8) + (pickData[2] << 16);
-    std::cout << "Id: " << pickedId << ", pickingX: " << pickingX
-              << ", pickingY: " << pickingY << " cursorX: " << sceneCursorPos.X
+    objectPicker.setPickedId(pickData);
+    u32 pickedId = objectPicker.getPickedId();
+    std::string pickedName = currModel->getMeshNameById(pickedId);
+
+    if (mouseController.mLeft.mEndedDown && pickedId != 0) {
+      if (currModel->getActiveAnimation()->mFrozenJointName == pickedName) {
+        currModel->getActiveAnimation()->mFrozenJointName = "";
+      } else {
+        currModel->getActiveAnimation()->mFrozenJointName = pickedName;
+        currModel->getActiveAnimation()->mFrozenJointTime =
+            currState.mCurrentTimeInSeconds;
+      }
+    }
+
+    std::cout << "Name: " << pickedName << ", Id: " << pickedId
+              << ", pickingX: " << pickingX << ", pickingY: " << pickingY
+              << " cursorX: " << sceneCursorPos.X
               << ", cursorY: " << sceneCursorPos.Y << std::endl;
     // END PICKING PHASE ===========
     FramebufferGL::Bind(framebuffer->mId, clearColor, clearMask,
@@ -304,7 +337,7 @@ i32 main() {
 
     // NOTE(Jovan): Render model
     riggedPhong.SetUniform4m("uBones", BoneTransforms);
-    currModel->render(riggedPhong, pickedId);
+    renderPass(currState, riggedPhong, objectPicker);
 
     FramebufferGL::Bind(0, clearColor, clearMask, currState.mWindow.mSize);
     glUseProgram(0);
@@ -351,8 +384,7 @@ i32 main() {
       if (currState.mFramebuffer.mSize.X != windowSize.x ||
           currState.mFramebuffer.mSize.Y != windowSize.y) {
         currState.mFramebuffer.Resize(windowSize.x, windowSize.y);
-        resizePickingFramebuffer(pickingFramebuffer, pickingDepthBuffer,
-                                 pickingTexture, windowSize.x, windowSize.y);
+        objectPicker.resizeFramebuffer(windowSize.x, windowSize.y);
       }
 
       ImGui::Image((ImTextureID)currState.mFramebuffer.mTexture, windowSize,

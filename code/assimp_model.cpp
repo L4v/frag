@@ -38,7 +38,7 @@ void AssimpModel::loadMesh(const aiScene *scene, const aiMesh *mesh) {
   std::vector<u32> indices;
   loadMeshIndices(mesh, indices);
 
-  mMeshes.push_back(Mesh(vertices, indices));
+  mMeshes.push_back(Mesh(mesh->mName.C_Str(), vertices, indices));
 }
 
 void AssimpModel::loadMeshVertices(const aiMesh *mesh,

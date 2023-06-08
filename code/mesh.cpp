@@ -10,8 +10,9 @@ Mesh::Vertex::Vertex(const r32 *position, const r32 *normal,
   mWeights = v4(weights);
 }
 
-Mesh::Mesh(const std::vector<Vertex> &vertices,
+Mesh::Mesh(const std::string &name, const std::vector<Vertex> &vertices,
            const std::vector<u32> &indices) {
+  mName = name;
   mVertices = std::vector<Vertex>(vertices);
   mIndices = std::vector<u32>(indices);
 
@@ -64,6 +65,8 @@ void Mesh::render(const Shader &program) const {
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
   glDrawElements(GL_TRIANGLES, mIndices.size(), GL_UNSIGNED_INT, 0);
 }
+
+std::string Mesh::getName() const { return mName; }
 
 // m44 &Mesh::getModelTransform() { return mModelTransform; }
 // void Mesh::setModelTransform(const m44 &transform) {

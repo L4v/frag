@@ -48,6 +48,7 @@ public:
 
   void
   setActiveAnimation(i32 animationIdx); // TODO(Jovan): Temp way of doing it
+  Animation *getActiveAnimation() const;
   void addInverseBindPoseMatrix(const m44 &matrix);
   void setInverseGlobalTransform(const m44 &transform);
   void mapNodeToNodeIdx(i32 key, i32 value);
@@ -70,6 +71,7 @@ public:
   void addMesh(const Mesh &mesh);
   i32 getTextureIdByName(const std::string &name);
   void mapNameToTexture(const std::string &name, const ModelTexture &texture);
+  std::string getMeshNameById(u32 meshId) const;
 };
 
 #endif

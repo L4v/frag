@@ -869,6 +869,15 @@ inline m44 perspective(r32 angleFOVY, r32 aspectRatio, r32 near, r32 far) {
              2.0f * far * near / (near - far), 0.0f);
 }
 
+inline m44 frustum(r32 left, r32 right, r32 bottom, r32 top, r32 near,
+                   r32 far) {
+  return m44(2 * near / (right - left), 0.0f, (right + left) / (right - left),
+             0.0f, 0.0f, 2 * near / (top - bottom),
+             (top + bottom) / (top - bottom), 0.0f, 0.0f, 0.0f,
+             -(far + near) / (far - near), -2.0f * far * near / (far - near),
+             0.0f, 0.0f, -1.0, 0.0);
+}
+
 // NOTE(Jovan): Orthographic projection
 inline m44 Orthographic(r32 left, r32 right, r32 bottom, r32 top, r32 near,
                         r32 far) {

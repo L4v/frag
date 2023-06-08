@@ -108,7 +108,7 @@ void TinyGltfModelLoader::traverseNodes(tinygltf::Model *tinyModel,
 
   if (TinyNode.mesh >= 0) {
     gltfModel.setInverseGlobalTransform(~N.mGlobalTransform);
-    loadMesh(tinyModel, gltfModel, TinyNode.mesh);
+    loadMesh(tinyModel, gltfModel, TinyNode.mesh, TinyNode.name);
   }
 
   for (i32 ChildIdx : TinyNode.children) {
@@ -141,7 +141,7 @@ m44 TinyGltfModelLoader::getLocalTransform(const tinygltf::Node &node) {
 }
 
 void TinyGltfModelLoader::loadMesh(tinygltf::Model *tinyModel, Model &gltfModel,
-                                   u32 meshIdx) {
+                                   u32 meshIdx, const std::string &meshName) {
   tinygltf::Mesh &TinyMesh = tinyModel->meshes[meshIdx];
   tinygltf::Primitive &Primitive0 = TinyMesh.primitives[0];
 
@@ -154,7 +154,7 @@ void TinyGltfModelLoader::loadMesh(tinygltf::Model *tinyModel, Model &gltfModel,
   std::vector<u32> Indices;
   loadIndices(tinyModel, IndexAccessordIdx, Indices);
 
-  Mesh NewMesh(Vertices, Indices);
+  Mesh NewMesh(meshName, Vertices, Indices);
 
   tinygltf::Material &TinyMaterial = tinyModel->materials[Primitive0.material];
   tinygltf::TextureInfo &TexInfo =

@@ -29,8 +29,10 @@ public:
 
   Material mMaterial;
 
-  Mesh(const std::vector<Vertex> &vertices, const std::vector<u32> &indices);
+  Mesh(const std::string &name, const std::vector<Vertex> &vertices,
+       const std::vector<u32> &indices);
   void render(const Shader &program) const;
+  std::string getName() const;
   // m44 &getModelTransform();
   // void setModelTransform(const m44 &transform); // TODO(Jovan): Needed?
 
@@ -41,6 +43,7 @@ private:
   u32 VBO;
   u32 EBO;
   m44 mModelTransform;
+  std::string mName;
 };
 
 #endif

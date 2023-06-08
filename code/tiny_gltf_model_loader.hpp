@@ -22,7 +22,8 @@ private:
   void loadMeshVertices(tinygltf::Model *tinyModel,
                         std::map<std::string, int> &attributes,
                         std::vector<Mesh::Vertex> &outVertices);
-  void loadMesh(tinygltf::Model *tinyModel, Model &gltfModel, u32 meshIdx);
+  void loadMesh(tinygltf::Model *tinyModel, Model &gltfModel, u32 meshIdx,
+                const std::string &meshName);
   void loadJointsFromNodes(tinygltf::Model *tinyModel, Model &gltfModel,
                            const tinygltf::Skin &skin);
   void loadAnimations(tinygltf::Model *tinyModel, Model &gltfModel);

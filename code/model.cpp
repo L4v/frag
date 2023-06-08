@@ -34,10 +34,15 @@ void Model::calculateJointTransforms(std::vector<m44> &jointTransforms,
   std::vector<m44> LocalTransforms(mJoints.size());
   std::vector<m44> GlobalJointTransforms(mJoints.size());
   jointTransforms.resize(mJoints.size());
-
+  r64 animationTimeInSeconds = timeInSeconds;
   for (u32 i = 0; i < mJoints.size(); ++i) {
     const Joint &J = mJoints[i];
     if (!mAnimations.empty()) {
+      if (J.mName == mActiveAnimation->mFrozenJointName) {
+        animationTimeInSeconds = mActiveAnimation->mFrozenJointTime;
+      } else {
+        animationTimeInSeconds = timeInSeconds;
+      }
       std::map<i32, AnimKeyframes>::iterator KeyframesIt =
           mActiveAnimation->mJointKeyframes.find(J.mIdx);
       if (KeyframesIt != mActiveAnimation->mJointKeyframes.end()) {
@@ -46,7 +51,7 @@ void Model::calculateJointTransforms(std::vector<m44> &jointTransforms,
         m44 R(1.0);
         m44 S(1.0);
         r64 clampedTimeInSeconds =
-            mActiveAnimation->GetAnimationTime(timeInSeconds);
+            mActiveAnimation->GetAnimationTime(animationTimeInSeconds);
 
         if (K.mTranslation.mCount > 0) {
           T.Translate(K.mTranslation.interpolate(clampedTimeInSeconds));
@@ -93,7 +98,7 @@ void Model::render(const Shader &program, u32 highlightedId) {
     r32 b = ((id & 0x00FF0000) >> 16) / 255.0f;
     program.SetUniform4f("uId", v4(r, g, b, 1.0f));
     program.SetUniform4m("uModel", mModelTransform);
-    if (highlightedId == id) {
+    if (highlightedId && highlightedId == id) {
       program.SetUniform4f("uHighlightColor", v4(1.0f, 0.0f, 1.0f, 0.0f));
     } else {
       program.SetUniform4f("uHighlightColor", v4(1.0f));
@@ -169,3 +174,13 @@ void Model::mapNameToTexture(const std::string &name,
                              const ModelTexture &texture) {
   mTextures[name] = texture;
 }
+
+std::string Model::getMeshNameById(u32 meshId) const {
+  meshId -= 1;
+  if (meshId < 0 || meshId >= mMeshes.size()) {
+    return "";
+  }
+  return mMeshes[meshId].getName();
+}
+
+Animation *Model::getActiveAnimation() const { return mActiveAnimation; }
