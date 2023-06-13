@@ -65,24 +65,12 @@ void TinyGltfModelLoader::loadNodes(tinygltf::Model *tinyModel,
 void TinyGltfModelLoader::loadJointsFromNodes(tinygltf::Model *tinyModel,
                                               Model &gltfModel,
                                               const tinygltf::Skin &skin) {
-  for (u32 i = 0; i < skin.joints.size(); ++i) {
-    i32 SkinJointIdx = skin.joints[i];
-    // i32 NodeIdx = mNodeToNodeIdx[SkinJointIdx];
-    i32 NodeIdx = gltfModel.getNodeIdxMappedToNode(SkinJointIdx);
-    const Node N = gltfModel.getNode(NodeIdx);
-    // mNodeToJointIdx[SkinJointIdx] = mJoints.size();
-    gltfModel.mapNodeToJointIdx(
-        SkinJointIdx,
-        gltfModel
-            .getJointCount()); // TODO(Jovan): Also move this to a function?
-    Joint J(N, SkinJointIdx, gltfModel.getInverseBindPoseMatrix(i));
-
-    // if (mNodeToJointIdx.find(N.mParentIdx) != mNodeToJointIdx.end()) {
-    if (gltfModel.checkIfNodeToJointIdxExists(N.mParentIdx)) {
-      J.mParentIdx = N.mParentIdx;
-    }
-
-    gltfModel.addJoint(J);
+  for (i32 i = 0; i < skin.joints.size(); i++) {
+    i32 skinJointIdx = skin.joints[i];
+    const Node N = gltfModel.getNodeByExternalId(skinJointIdx);
+    m44 inverseBindPose = gltfModel.getInverseBindPoseMatrix(i);
+    Joint J(N, skinJointIdx, inverseBindPose);
+    gltfModel.addJoint(J, N.mParentIdx);
   }
 
   // mJointCount = mJoints.size();
@@ -90,21 +78,18 @@ void TinyGltfModelLoader::loadJointsFromNodes(tinygltf::Model *tinyModel,
   assert(gltfModel.getJointCount() <= tinyModel->nodes.size());
   for (u32 i = 0; i < skin.joints.size(); ++i) {
     // assert(mNodeToJointIdx[skin.joints[i]] == i);
-    assert(gltfModel.getNodeIdxMappedToJoint(skin.joints[i]) == i);
+    assert(gltfModel.getJointIdxByExternalId(skin.joints[i]) == i);
   }
 }
 
 void TinyGltfModelLoader::traverseNodes(tinygltf::Model *tinyModel,
-                                        Model &gltfModel, i32 nodeIdx,
+                                        Model &gltfModel, i32 tinyNodeId,
                                         i32 parentIdx,
                                         const m44 &parentTransform) {
-  const tinygltf::Node TinyNode = tinyModel->nodes[nodeIdx];
-  Node N(TinyNode.name, nodeIdx, parentIdx, getLocalTransform(TinyNode),
+  const tinygltf::Node TinyNode = tinyModel->nodes[tinyNodeId];
+  Node N(TinyNode.name, tinyNodeId, parentIdx, getLocalTransform(TinyNode),
          parentTransform);
-
-  gltfModel.mapNodeToNodeIdx(
-      nodeIdx, gltfModel.getNodeCount()); // TODO(Jovan): mapNodeToNodeCount???
-  gltfModel.addNode(N); // TODO(Jovan): Or just add login to addNode
+  gltfModel.addNode(N);
 
   if (TinyNode.mesh >= 0) {
     gltfModel.setInverseGlobalTransform(~N.mGlobalTransform);
@@ -113,7 +98,8 @@ void TinyGltfModelLoader::traverseNodes(tinygltf::Model *tinyModel,
 
   for (i32 ChildIdx : TinyNode.children) {
     N.mChildren.push_back(ChildIdx);
-    traverseNodes(tinyModel, gltfModel, ChildIdx, nodeIdx, N.mGlobalTransform);
+    traverseNodes(tinyModel, gltfModel, ChildIdx, N.mId,
+                  N.mGlobalTransform); // TODO(Jovan): REMOVE RECURSION
   }
 }
 
@@ -216,7 +202,7 @@ void TinyGltfModelLoader::loadAnimations(tinygltf::Model *tinyModel,
 
     for (const Joint &J : gltfModel.getJoints()) {
       const std::map<i32, std::vector<i32>>::const_iterator ChannelIt =
-          CurrAnim.mNodeToChannel.find(J.mIdx);
+          CurrAnim.mNodeToChannel.find(J.mExternalId);
       if (ChannelIt != CurrAnim.mNodeToChannel.end()) {
         for (i32 ChannelIdx : ChannelIt->second) {
           const tinygltf::AnimationChannel &Channel =
@@ -231,15 +217,17 @@ void TinyGltfModelLoader::loadAnimations(tinygltf::Model *tinyModel,
           std::vector<r32> Values;
           loadFloats(tinyModel, Sampler.output, Values);
           const std::string &Path = Channel.target_path;
+
+          // CurrAnim.loadJointKeyframe(); TODO(Jovan)
           std::map<i32, AnimKeyframes>::iterator KeyframesIt =
-              CurrAnim.mJointKeyframes.find(J.mIdx);
+              CurrAnim.mJointKeyframes.find(J.mId);
 
           CurrAnim.mDurationInSeconds =
               std::max(CurrAnim.mDurationInSeconds, Input.maxValues[0]);
 
           if (KeyframesIt == CurrAnim.mJointKeyframes.end()) {
-            CurrAnim.mJointKeyframes[J.mIdx] = AnimKeyframes();
-            KeyframesIt = CurrAnim.mJointKeyframes.find(J.mIdx);
+            CurrAnim.mJointKeyframes[J.mId] = AnimKeyframes();
+            KeyframesIt = CurrAnim.mJointKeyframes.find(J.mId);
           }
 
           KeyframesIt->second.Load(Path, Output.count, Times.data(),

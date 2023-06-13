@@ -11,6 +11,7 @@
 class TinyGltfModelLoader : public IModelLoader {
 private:
   std::vector<u8> mData;
+  std::map<i32, i32> mExternalToInternal;
 
   void loadFloats(tinygltf::Model *tinyModel, i32 accessorIdx,
                   std::vector<r32> &out);
@@ -27,8 +28,8 @@ private:
   void loadJointsFromNodes(tinygltf::Model *tinyModel, Model &gltfModel,
                            const tinygltf::Skin &skin);
   void loadAnimations(tinygltf::Model *tinyModel, Model &gltfModel);
-  void traverseNodes(tinygltf::Model *tinyModel, Model &gltfModel, i32 nodeIdx,
-                     i32 parentIdx, const m44 &parentTransform);
+  void traverseNodes(tinygltf::Model *tinyModel, Model &gltfModel,
+                     i32 tinyNodeId, i32 parentIdx, const m44 &parentTransform);
 
 public:
   void load(Model &model);

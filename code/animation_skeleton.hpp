@@ -6,9 +6,9 @@
 #include <vector>
 
 struct Node {
-  Node(const std::string &nodeName, i32 nodeIdx, i32 parentIdx,
+  Node(const std::string &nodeName, i32 externalid, i32 parentIdx,
        const m44 &localTransform, const m44 &parentTransform) {
-    mIdx = nodeIdx;
+    mExternalId = externalid;
     mParentIdx = parentIdx;
     mLocalTransform = localTransform;
     mGlobalTransform = mLocalTransform * parentTransform;
@@ -16,7 +16,8 @@ struct Node {
       mName = nodeName;
     }
   }
-  i32 mIdx;
+  i32 mId;
+  i32 mExternalId;
   i32 mParentIdx;
   std::string mName;
   std::vector<i32> mChildren;
@@ -25,19 +26,21 @@ struct Node {
 };
 
 struct Joint {
-  Joint(const Node &node, i32 skinJointIdx,
-        const m44 &inverseBindPoseTransform) {
+  Joint(const Node &node, i32 externalId, const m44 &inverseBindPoseTransform) {
     mParentIdx = -1;
-    mIdx = skinJointIdx;
-    mName = node.mName;
+    mExternalId = externalId;
     mLocalTransform = node.mLocalTransform;
     mInverseBindPoseTransform = inverseBindPoseTransform;
+    mName = node.mName;
+    mFrozenTimeInSeconds = -1.0;
   }
-  i32 mIdx;
+  i32 mId;
+  i32 mExternalId;
   i32 mParentIdx;
-  std::string mName;
+  r64 mFrozenTimeInSeconds;
   m44 mLocalTransform;
   m44 mInverseBindPoseTransform;
+  std::string mName;
 };
 
 #endif

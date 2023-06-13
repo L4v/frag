@@ -33,8 +33,9 @@ struct MouseController {
 
 struct KeyboardController {
   union {
-    ButtonState mButtons[2];
+    ButtonState mButtons[3];
     struct {
+      ButtonState mFreezeModel;
       ButtonState mChangeModel;
       ButtonState mQuit;
     };

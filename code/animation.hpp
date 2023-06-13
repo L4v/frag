@@ -47,8 +47,6 @@ struct Animation {
   r32 mSpeed;
   std::map<i32, std::vector<i32>> mNodeToChannel;
   std::map<i32, AnimKeyframes> mJointKeyframes; // TODO(Jovan): To class
-  std::string mFrozenJointName;
-  r64 mFrozenJointTime;
 
   Animation(i32 idx);
   r64 GetAnimationTime(r64 timeInSeconds);

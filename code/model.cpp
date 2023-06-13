@@ -1,4 +1,7 @@
 #include "model.hpp"
+#include <algorithm>
+#include <stdexcept>
+#include <string>
 
 ModelTexture::ModelTexture() {
   mWidth = 0.0f;
@@ -34,17 +37,14 @@ void Model::calculateJointTransforms(std::vector<m44> &jointTransforms,
   std::vector<m44> LocalTransforms(mJoints.size());
   std::vector<m44> GlobalJointTransforms(mJoints.size());
   jointTransforms.resize(mJoints.size());
-  r64 animationTimeInSeconds = timeInSeconds;
   for (u32 i = 0; i < mJoints.size(); ++i) {
     const Joint &J = mJoints[i];
     if (!mAnimations.empty()) {
-      if (J.mName == mActiveAnimation->mFrozenJointName) {
-        animationTimeInSeconds = mActiveAnimation->mFrozenJointTime;
-      } else {
-        animationTimeInSeconds = timeInSeconds;
-      }
+      r64 animationTimeInSeconds = J.mFrozenTimeInSeconds >= 0.0
+                                       ? J.mFrozenTimeInSeconds
+                                       : timeInSeconds;
       std::map<i32, AnimKeyframes>::iterator KeyframesIt =
-          mActiveAnimation->mJointKeyframes.find(J.mIdx);
+          mActiveAnimation->mJointKeyframes.find(J.mId);
       if (KeyframesIt != mActiveAnimation->mJointKeyframes.end()) {
         AnimKeyframes K = KeyframesIt->second;
         m44 T(1.0);
@@ -75,7 +75,7 @@ void Model::calculateJointTransforms(std::vector<m44> &jointTransforms,
 
   GlobalJointTransforms[0] = m44(&LocalTransforms[0][0][0]);
   for (u32 i = 1; i < mJoints.size(); ++i) {
-    u32 ParentIdx = mNodeToJointIdx[mJoints[i].mParentIdx];
+    i32 ParentIdx = mJoints[i].mParentIdx;
     GlobalJointTransforms[i] =
         m44(&LocalTransforms[i][0][0]) * GlobalJointTransforms[ParentIdx];
   }
@@ -119,13 +119,12 @@ void Model::setInverseGlobalTransform(const m44 &transform) {
   mInverseGlobalTransform = transform;
 }
 
-void Model::mapNodeToNodeIdx(i32 key, i32 value) {
-  mNodeToNodeIdx[key] = value;
-}
-
 u32 Model::getNodeCount() const { return mNodes.size(); }
 
-void Model::addNode(const Node &node) { mNodes.push_back(node); }
+void Model::addNode(Node &node) {
+  node.mId = mNodes.size();
+  mNodes.push_back(node);
+}
 
 std::vector<Joint> Model::getJoints() const { return mJoints; }
 
@@ -133,15 +132,17 @@ void Model::addAnimation(const Animation &animation) {
   mAnimations.push_back(animation);
 }
 
-i32 Model::getNodeIdxMappedToNode(i32 nodeIdx) {
-  return mNodeToNodeIdx[nodeIdx];
+Node Model::getNodeByExternalId(i32 externalId) {
+  for (Node node : mNodes) {
+    if (node.mExternalId == externalId) {
+      return node;
+    }
+  }
+  throw std::runtime_error(
+      "Node with external id: " + std::to_string(externalId) + " not found");
 }
 
-Node Model::getNode(i32 nodeIdx) const { return mNodes[nodeIdx]; }
-
-void Model::mapNodeToJointIdx(i32 key, i32 value) {
-  mNodeToJointIdx[key] = value;
-}
+Node Model::getNodeById(i32 id) const { return mNodes[id]; }
 
 u32 Model::getJointCount() const { return mJoints.size(); }
 
@@ -149,14 +150,18 @@ m44 Model::getInverseBindPoseMatrix(u32 idx) const {
   return mInverseBindPoseMatrices[idx];
 }
 
-bool Model::checkIfNodeToJointIdxExists(u32 nodeIdx) const {
-  return mNodeToJointIdx.find(nodeIdx) != mNodeToJointIdx.end();
-}
+Joint Model::getJointById(i32 id) { return mJoints[id]; }
 
-void Model::addJoint(const Joint &joint) { mJoints.push_back(joint); }
+void Model::addJoint(Joint &joint, i32 nodeParentIdx) {
+  joint.mId = mJoints.size();
 
-i32 Model::getNodeIdxMappedToJoint(i32 nodeIdx) {
-  return mNodeToJointIdx[nodeIdx];
+  if (nodeParentIdx >= 0 && nodeParentIdx < mNodes.size()) {
+    const Node &parentNode = mNodes[nodeParentIdx];
+    i32 externalParentId = parentNode.mExternalId;
+    joint.mParentIdx = getJointIdxByExternalId(externalParentId);
+  }
+
+  mJoints.push_back(joint);
 }
 
 void Model::addMesh(const Mesh &mesh) { mMeshes.push_back(mesh); }
@@ -184,3 +189,41 @@ std::string Model::getMeshNameById(u32 meshId) const {
 }
 
 Animation *Model::getActiveAnimation() const { return mActiveAnimation; }
+
+Joint &Model::getJointByName(const std::string &name) {
+  for (Joint &joint : mJoints) {
+    if (joint.mName == name) {
+      return joint;
+    }
+  }
+  throw std::runtime_error("Joint by name of: " + name + " not found");
+}
+
+i32 Model::getJointIdxByExternalId(i32 externalId) {
+  for (u32 i = 0; i < mJoints.size(); ++i) {
+    const Joint &joint = mJoints[i];
+    if (joint.mExternalId == externalId) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+void Model::freezeJoint(const std::string &name, r64 timeInSeconds) {
+  Joint &initialJoint = getJointByName(name);
+  initialJoint.mFrozenTimeInSeconds = timeInSeconds;
+  i32 parentIdx = initialJoint.mParentIdx;
+  while (parentIdx != -1) {
+    Joint &joint = mJoints[parentIdx];
+    joint.mFrozenTimeInSeconds = timeInSeconds;
+    parentIdx = joint.mParentIdx;
+    std::cout << "Freezing. Parent: " << parentIdx << std::endl;
+  }
+}
+
+void Model::unfreezeJoints() {
+  for (Joint &joint : mJoints) {
+    joint.mFrozenTimeInSeconds = -1.0f;
+  }
+}

@@ -28,10 +28,11 @@ static void framebufferSizeCallback(GLFWwindow *window, i32 width, i32 height) {
   CurrState->mWindow.mSize = v2(width, height);
 }
 
-static void processButtonState(ButtonState *newState, bool isDown) {
-  assert(newState->mEndedDown != isDown);
-  newState->mEndedDown = isDown;
-  ++newState->mHalfTransitionCount;
+static void processButtonState(ButtonState *buttonState, bool isDown) {
+  assert(buttonState->mEndedDown != isDown);
+  buttonState->mEndedDown = isDown;
+  buttonState->mHalfTransitionCount =
+      (buttonState->mHalfTransitionCount + 1) % 2;
 }
 
 static void keyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action,
@@ -42,6 +43,9 @@ static void keyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action,
   if (action == GLFW_PRESS || action == GLFW_RELEASE) {
     bool IsDown = action == GLFW_PRESS;
     switch (key) {
+    case GLFW_KEY_F: {
+      processButtonState(&KC->mFreezeModel, IsDown);
+    } break;
     case GLFW_KEY_SPACE: {
       processButtonState(&KC->mChangeModel, IsDown);
     } break;
@@ -270,6 +274,7 @@ i32 main() {
     currState.BeginFrame();
     glfwPollEvents();
 
+    KeyboardController keyboardController = currState.GetNewInput().mKeyboard;
     MouseController mouseController = currState.GetNewInput().mMouse;
     sceneCursorPos = mouseController.mCursorPos - sceneWindowPos;
 
@@ -312,14 +317,8 @@ i32 main() {
     u32 pickedId = objectPicker.getPickedId();
     std::string pickedName = currModel->getMeshNameById(pickedId);
 
-    if (mouseController.mLeft.mEndedDown && pickedId != 0) {
-      if (currModel->getActiveAnimation()->mFrozenJointName == pickedName) {
-        currModel->getActiveAnimation()->mFrozenJointName = "";
-      } else {
-        currModel->getActiveAnimation()->mFrozenJointName = pickedName;
-        currModel->getActiveAnimation()->mFrozenJointTime =
-            currState.mCurrentTimeInSeconds;
-      }
+    if (keyboardController.mFreezeModel.mEndedDown && pickedId != 0) {
+      currModel->freezeJoint(pickedName, currState.mCurrentTimeInSeconds);
     }
 
     std::cout << "Name: " << pickedName << ", Id: " << pickedId

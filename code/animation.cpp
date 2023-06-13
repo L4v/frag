@@ -96,8 +96,6 @@ Animation::Animation(i32 idx) {
   mIdx = idx;
   mDurationInSeconds = 0.0f;
   mSpeed = 1.0f;
-  mFrozenJointName = "";
-  mFrozenJointTime = 0.0;
 }
 
 r64 Animation::GetAnimationTime(r64 timeInSeconds) {
