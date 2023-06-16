@@ -36,7 +36,7 @@ struct KeyboardController {
     ButtonState mButtons[3];
     struct {
       ButtonState mFreezeModel;
-      ButtonState mChangeModel;
+      ButtonState mPauseAnimation;
       ButtonState mQuit;
     };
   };
@@ -86,7 +86,6 @@ private:
   Input *mNewInput;
   Input *mOldInput;
   Model mBonesModel;
-  Model mMusclesModel;
 
 public:
   FramebufferGL mFramebuffer;
@@ -97,7 +96,7 @@ public:
   r32 mDT;
   r32 mCurrentTimeInSeconds;
   bool mImGUIInitialized;
-  bool mShowBones;
+  bool mIsAnimationPaused;
 
   State(OrbitalCamera *camera);
 
@@ -105,7 +104,6 @@ public:
   void EndFrame();
   Input &GetNewInput();
   const Input &GetOldInput();
-  void UpdateModel();
 };
 
 void UpdateState(State *state);

@@ -94,19 +94,18 @@ Window::Window(u32 width, u32 height) : mSize(width, height) {
 
 State::State(OrbitalCamera *camera)
     : mWindow(800, 600), mFramebuffer(1920, 1080), mCamera(camera),
-      mBonesModel("../res/backleg1rigging_separation.gltf"),
-      mMusclesModel("../res/backleg_muscles.glb") {
+      mBonesModel("../res/backleg1rigging_separation.gltf") {
   mNewInput = &mInputBuffers[0];
   mOldInput = &mInputBuffers[1];
   mCamera = camera;
   mProjection = m44(1.0f);
   mDT = 0.0f;
   mImGUIInitialized = false;
-  mShowBones = true;
+  mIsAnimationPaused = false;
 
   TinyGltfModelLoader tinyGltfModelLoader;
   tinyGltfModelLoader.load(mBonesModel);
-  tinyGltfModelLoader.load(mMusclesModel);
+  mCurrModel = &mBonesModel;
 }
 
 Input &State::GetNewInput() { return *mNewInput; }
@@ -135,17 +134,13 @@ void State::EndFrame() {
   mOldInput = Tmp;
 }
 
-void State::UpdateModel() {
-  mCurrModel = mShowBones ? &mBonesModel : &mMusclesModel;
-}
-
 void UpdateState(State *state) {
   const Input *CurrInput = &state->GetNewInput();
   const KeyboardController *NewKC = &CurrInput->mKeyboard;
   OrbitalCamera *Camera = state->mCamera;
-  if (NewKC->mChangeModel.mEndedDown &&
-      NewKC->mChangeModel.mHalfTransitionCount) {
-    state->mShowBones = !state->mShowBones;
+  if (NewKC->mPauseAnimation.mEndedDown &&
+      NewKC->mPauseAnimation.mHalfTransitionCount) {
+    state->mIsAnimationPaused = !state->mIsAnimationPaused;
   }
 
   const MouseController *MC = &CurrInput->mMouse;
@@ -162,6 +157,4 @@ void UpdateState(State *state) {
                                    state->mFramebuffer.mSize.X /
                                        (r32)state->mFramebuffer.mSize.Y,
                                    0.1f, 100.0f);
-
-  state->UpdateModel();
 }

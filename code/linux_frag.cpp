@@ -5,19 +5,33 @@
 #include <cassert>
 #include <iostream>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "include/imgui/imgui.h"
 #include "include/imgui/imgui_impl_glfw.h"
 #include "include/imgui/imgui_impl_opengl3.h"
 #include "include/imgui/imgui_internal.h"
 
+#include "include/imgui/imnodes.h"
+
 #include "frag.hpp"
 #include "model.hpp"
 #include "shader.hpp"
 #include "types.hpp"
 
-static const i32 DefaultWindowWidth = 800;
-static const i32 DefaultWindowHeight = 600;
+struct GraphNode {
+  i32 id;
+  i32 parentIdx;
+  i32 jointId;
+  i32 outputAttributeId;
+  i32 inputAttributeId;
+  std::string name;
+  i32 childNodeCount;
+};
+
+static const i32 DefaultWindowWidth = 1024;
+static const i32 DefaultWindowHeight = 768;
 
 static void errorCallback(int error, const char *description) {
   std::cerr << "[Err] GLFW: " << description << std::endl;
@@ -47,7 +61,7 @@ static void keyCallback(GLFWwindow *window, i32 key, i32 scode, i32 action,
       processButtonState(&KC->mFreezeModel, IsDown);
     } break;
     case GLFW_KEY_SPACE: {
-      processButtonState(&KC->mChangeModel, IsDown);
+      processButtonState(&KC->mPauseAnimation, IsDown);
     } break;
 
     case GLFW_KEY_ESCAPE: {
@@ -198,6 +212,74 @@ void renderPass(const State &state, const Shader &shader,
   state.mCurrModel->render(shader, objectPicker.getPickedId());
 }
 
+void createGraphNode(const GraphNode &graphNode) {
+  ImNodes::BeginNode(graphNode.id);
+  ImNodes::BeginNodeTitleBar();
+  ImGui::TextUnformatted(graphNode.name.c_str());
+  ImNodes::EndNodeTitleBar();
+
+  ImNodes::BeginOutputAttribute(graphNode.outputAttributeId);
+  ImGui::TextUnformatted("Output");
+  ImNodes::EndOutputAttribute();
+
+  ImNodes::BeginInputAttribute(graphNode.inputAttributeId);
+  ImGui::TextUnformatted("Input");
+  ImNodes::EndInputAttribute();
+  ImNodes::EndNode();
+}
+
+void createNodeGraph(const std::vector<GraphNode> &nodes) {
+  std::vector<std::pair<i32, i32>> links;
+  for (i32 nodeIdx = nodes.size() - 1; nodeIdx >= 0; nodeIdx--) {
+    const GraphNode &graphNode = nodes[nodeIdx];
+    i32 nodeId = nodeIdx;
+    std::string nodeTitle = graphNode.name;
+
+    createGraphNode(graphNode);
+    i32 parentIdx = graphNode.parentIdx;
+    if (parentIdx != -1) {
+      const GraphNode &parentNode = nodes[parentIdx];
+      links.push_back(std::pair<i32, i32>(parentNode.outputAttributeId,
+                                          graphNode.inputAttributeId));
+    }
+  }
+  for (i32 i = 0; i < links.size(); ++i) {
+    const std::pair<i32, i32> &link = links[i];
+    ImNodes::Link(i, link.first, link.second);
+  }
+}
+
+void mapJointsToNodes(const std::vector<Joint> &joints,
+                      std::vector<GraphNode> &nodes) {
+  i32 nodeId = 0;
+  i32 attributeIdx = 0;
+  for (i32 jointIdx = 0; jointIdx < joints.size(); ++jointIdx) {
+    const Joint &joint = joints[jointIdx];
+    if (joint.mName.find(".Controller") != std::string::npos) {
+      continue;
+    }
+
+    nodes.push_back({.id = nodeId,
+                     .parentIdx = joint.mParentIdx,
+                     .jointId = joint.mId,
+                     .outputAttributeId = attributeIdx,
+                     .inputAttributeId = attributeIdx + 1,
+                     .name = joint.mName});
+    attributeIdx += 2;
+    ++nodeId;
+  }
+
+  for (i32 nodeIdx = nodes.size() - 1; nodeIdx >= 0; --nodeIdx) {
+    const GraphNode &graphNode = nodes[nodeIdx];
+    if (graphNode.parentIdx == -1) {
+      continue;
+    }
+
+    GraphNode parentGraphNode = nodes[graphNode.parentIdx];
+    parentGraphNode.childNodeCount++;
+  }
+}
+
 i32 main() {
   if (!glfwInit()) {
     std::cerr << "Failed to init GLFW" << std::endl;
@@ -223,6 +305,9 @@ i32 main() {
   ImGui_ImplGlfw_InitForOpenGL(glfwWindow, true);
   ImGui_ImplOpenGL3_Init("#version 330");
   ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+  // NOTE(Jovan): Init imnodes
+  ImNodes::CreateContext();
 
   Shader riggedPhong("../shaders/rigged.vert", "../shaders/rigged.frag");
   Shader pickingShader("../shaders/picking.vert", "../shaders/picking.frag");
@@ -257,6 +342,8 @@ i32 main() {
   const std::string mainWindowName = "Main";
   const std::string sceneWindowName = "Scene";
   const std::string modelWindowName = "Model";
+  const std::string cameraWindowName = "Camera";
+  const std::string nodeGraphWindowName = "Node Graph";
 
   v2 sceneCursorPos(0.0f);
   v2 sceneWindowPos(0.0f);
@@ -267,6 +354,9 @@ i32 main() {
   GLbitfield clearMask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
   v4 clearColor(0x34 / (r32)255, 0x49 / (r32)255, 0x5e / (r32)255, 1.0f);
 
+  r64 pausedAnimationTime = -1.0f;
+
+  bool isFirstLoop = true;
   while (!glfwWindowShouldClose(glfwWindow)) {
     timeInfo.frameStartMs = currentTimeInMillis();
     currState.mCurrentTimeInSeconds =
@@ -281,8 +371,16 @@ i32 main() {
     UpdateState(&currState);
     std::vector<m44> BoneTransforms;
     Model *currModel = currState.mCurrModel;
-    currModel->calculateJointTransforms(BoneTransforms,
-                                        currState.mCurrentTimeInSeconds);
+
+    r64 animationTime = currState.mCurrentTimeInSeconds;
+    if (currState.mIsAnimationPaused) {
+      pausedAnimationTime = (pausedAnimationTime < 0.0)
+                                ? currState.mCurrentTimeInSeconds
+                                : pausedAnimationTime;
+      animationTime = pausedAnimationTime;
+    }
+
+    currModel->calculateJointTransforms(BoneTransforms, animationTime);
     currModel->mModelTransform.LoadIdentity()
         .Translate(modelPosition)
         .Rotate(quat(v3(1.0f, 0.0f, 0.0f), modelRotation.X))
@@ -359,14 +457,19 @@ i32 main() {
       ImGui::DockBuilderRemoveNode(DockID);
       ImGui::DockBuilderAddNode(DockID, ImGuiDockNodeFlags_DockSpace);
       ImGui::DockBuilderSetNodeSize(DockID, Size);
-      ImGuiID LeftID = ImGui::DockBuilderSplitNode(DockID, ImGuiDir_Left, 0.5,
-                                                   NULL, &DockID);
-      ImGuiID BottomID = ImGui::DockBuilderSplitNode(LeftID, ImGuiDir_Down,
-                                                     0.5f, NULL, &LeftID);
-      ImGui::DockBuilderDockWindow("Model", LeftID);
-      ImGui::DockBuilderDockWindow("Camera", BottomID);
-      ImGui::DockBuilderDockWindow("Scene", DockID);
-      ImGui::DockBuilderFinish(DockID);
+      ImGuiID leftId, bottomLeftId, sceneId, nodeGraphId;
+
+      ImGui::DockBuilderSplitNode(DockID, ImGuiDir_Left, 0.5, &leftId, &DockID);
+      ImGui::DockBuilderSplitNode(leftId, ImGuiDir_Down, 0.5f, &bottomLeftId,
+                                  &leftId);
+      ImGui::DockBuilderSplitNode(DockID, ImGuiDir_Up, 0.5, &sceneId,
+                                  &nodeGraphId);
+
+      ImGui::DockBuilderDockWindow(modelWindowName.c_str(), leftId);
+      ImGui::DockBuilderDockWindow(cameraWindowName.c_str(), bottomLeftId);
+      ImGui::DockBuilderDockWindow(sceneWindowName.c_str(), sceneId);
+      ImGui::DockBuilderDockWindow(nodeGraphWindowName.c_str(), nodeGraphId);
+      ImGui::DockBuilderFinish(nodeGraphId);
       isMainWindowInitialized = true;
     }
 
@@ -401,7 +504,7 @@ i32 main() {
     ImGui::Begin(modelWindowName.c_str(), NULL,
                  ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::Text("Loaded model: %s", currModel->mFilePath.c_str());
-    ImGui::Checkbox("Show bones", &currState.mShowBones);
+    ImGui::Checkbox("Show bones", &currState.mIsAnimationPaused);
     ImGui::Spacing();
     ImGui::DragFloat3("Position", modelPosition.Values, 1e-3f);
     ImGui::DragFloat3("Rotation", modelRotation.Values, 1e-1f);
@@ -423,6 +526,39 @@ i32 main() {
     ImGui::Text("Yaw: %.2f", camera.mYaw * DEG);
     ImGui::End();
 
+    // NOTE(Jovan): Node Graph window
+    std::vector<Joint> joints = currModel->getJoints();
+    std::vector<GraphNode> nodes;
+    mapJointsToNodes(joints, nodes);
+
+    ImGui::Begin(nodeGraphWindowName.c_str(), NULL,
+                 ImGuiWindowFlags_AlwaysAutoResize);
+    ImNodes::BeginNodeEditor();
+    createNodeGraph(nodes);
+
+    if (isFirstLoop) {
+      for (i32 i = 0; i < nodes.size(); ++i) {
+        const GraphNode &graphNode = nodes[i];
+        ImVec2 previousNodeSize(0.0f, 0.0f);
+        ImVec2 previousNodePosition(0.0f, 0.0f);
+        if (graphNode.id != 0) {
+          previousNodeSize = ImNodes::GetNodeDimensions(graphNode.id - 1);
+
+          if (graphNode.parentIdx)
+            previousNodePosition =
+                ImNodes::GetNodeEditorSpacePos(graphNode.id - 1);
+        }
+        r32 spacing = 10.0f;
+        ImVec2 nodePosition(previousNodePosition.x + previousNodeSize.x +
+                                spacing,
+                            previousNodePosition.y);
+        ImNodes::SetNodeEditorSpacePos(graphNode.id, nodePosition);
+      }
+    }
+
+    ImNodes::EndNodeEditor();
+    ImGui::End();
+
     // NOTE(Jovan): Render UI
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -432,11 +568,16 @@ i32 main() {
     currState.mDT = timeInfo.getDeltaMs();
 
     glfwSwapBuffers(glfwWindow);
+
+    if (isFirstLoop) {
+      isFirstLoop = false;
+    }
   }
 
   // NOTE(Jovan): Dispose UI
   ImGui_ImplGlfw_Shutdown();
   ImGui_ImplOpenGL3_Shutdown();
+  ImNodes::DestroyContext();
   ImGui::DestroyContext();
 
   glfwDestroyWindow(glfwWindow);
